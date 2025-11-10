@@ -1,6 +1,6 @@
-# Bankgood Hello World - Minikube Deployment
+# Bankgood Bank Service - Minikube Deployment
 
-Ett enkelt Spring Boot Hello World-projekt för Bankgood-systemet, deployat på Minikube.
+Ett enkelt Spring Boot Bank Service-projekt för Bankgood-systemet, deployat på Minikube.
 
 ## Förutsättningar
 
@@ -31,14 +31,14 @@ eval $(minikube docker-env)
 ### 3. Bygga Docker Image
 
 ```bash
-cd hello-world
-docker build -t bankgood-hello:v1 .
+cd bank-service
+docker build -t bankgood-bank:v1 .
 ```
 
 ### 4. Verifiera att imagen finns
 
 ```bash
-docker images | grep bankgood-hello
+docker images | grep bankgood-bank
 ```
 
 ### 5. Deploya till Minikube
@@ -54,10 +54,10 @@ kubectl apply -f k8s/deployment.yaml
 kubectl get pods
 
 # Se service
-kubectl get svc bankgood-hello-service
+kubectl get svc bankgood-bank-service
 
 # Se deployment
-kubectl get deployment bankgood-hello
+kubectl get deployment bankgood-bank
 ```
 
 ### 7. Testa applikationen
@@ -75,7 +75,7 @@ curl http://$(minikube ip):30080/health
 
 Eller öppna i webbläsare:
 ```bash
-minikube service bankgood-hello-service
+minikube service bankgood-bank-service
 ```
 
 ## Förväntad Output
@@ -88,7 +88,7 @@ minikube service bankgood-hello-service
 ### Skala upp/ner replicas
 
 ```bash
-kubectl scale deployment bankgood-hello --replicas=3
+kubectl scale deployment bankgood-bank --replicas=3
 ```
 
 ### Se logs
@@ -132,7 +132,7 @@ Detta betyder att Kubernetes inte hittar din Docker image.
 **Lösning:**
 1. Kontrollera att du har kört `eval $(minikube docker-env)` i samma terminal där du bygger imagen
 2. Verifiera att `imagePullPolicy: Never` finns i deployment.yaml
-3. Kör `docker images` för att se att `bankgood-hello:v1` finns
+3. Kör `docker images` för att se att `bankgood-bank:v1` finns
 
 ### Problem: Kan inte nå applikationen på port 30080
 
@@ -144,7 +144,7 @@ kubectl get svc
 minikube ip
 
 # Försök öppna med minikube service kommando
-minikube service bankgood-hello-service --url
+minikube service bankgood-bank-service --url
 ```
 
 ### Problem: CrashLoopBackOff
@@ -177,7 +177,7 @@ kubectl top nodes
 1. Gör dina ändringar i koden
 2. Bygg om Docker imagen:
    ```bash
-   docker build -t bankgood-hello:v2 .
+   docker build -t bankgood-bank:v2 .
    ```
 3. Uppdatera deployment.yaml med ny image tag (v2)
 4. Applicera ändringen:
@@ -187,17 +187,17 @@ kubectl top nodes
 
 Eller använd rolling update:
 ```bash
-kubectl set image deployment/bankgood-hello bankgood-hello=bankgood-hello:v2
+kubectl set image deployment/bankgood-bank bankgood-bank=bankgood-bank:v2
 ```
 
 ## Struktur
 
 ```
-hello-world/
+bank-service/
 ├── src/
 │   ├── main/
-│   │   ├── java/com/bankgood/hello/
-│   │   │   ├── HelloWorldApplication.java
+│   │   ├── java/com/bankgood/bank/
+│   │   │   ├── BankServiceApplication.java
 │   │   │   └── HelloController.java
 │   │   └── resources/
 │   │       └── application.properties

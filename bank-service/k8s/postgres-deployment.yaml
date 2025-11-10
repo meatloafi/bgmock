@@ -1,0 +1,149 @@
+# k8s/postgres-deployment.yaml
+# PostgreSQL StatefulSet för Bankgood System
+
+---
+# ConfigMap: PostgreSQL Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config
+data:
+  POSTGRES_DB: bankgood
+  POSTGRES_USER: bankgood
+  # I produktion: använd Secrets istället för ConfigMap för password!
+
+---
+# Secret: PostgreSQL Password
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: bankgood123  # I produktion: generera säkert password!
+
+---
+# PersistentVolumeClaim: Storage för PostgreSQL
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce  # Endast en pod kan skriva åt gången
+  resources:
+    requests:
+      storage: 10Gi  # 10 GB storage
+
+---
+# StatefulSet: PostgreSQL Database
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  serviceName: postgres-service  # Headless service name
+  replicas: 1  # En PostgreSQL instans (för enkelhetens skull)
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine  # Lightweight PostgreSQL image
+        ports:
+        - containerPort: 5432
+          name: postgres
+        
+        # Environment variables från ConfigMap och Secret
+        envFrom:
+        - configMapRef:
+            name: postgres-config
+        - secretRef:
+            name: postgres-secret
+        
+        # Volume mount för persistent data
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+          subPath: postgres  # Undvik permission issues
+        
+        # Resource limits
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        # Liveness probe: Är PostgreSQL vid liv?
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - bankgood
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # Readiness probe: Är PostgreSQL redo för connections?
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - bankgood
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+
+---
+# Service: Exponera PostgreSQL inom Kubernetes cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP  # Endast tillgänglig inom cluster (ej utanför)
+  selector:
+    app: postgres
+  ports:
+  - port: 5432      # Service port
+    targetPort: 5432  # Container port
+    protocol: TCP
+    name: postgres
+
+---
+# OPTIONAL: Headless Service för StatefulSet
+# (Används om du vill ha direct pod access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  labels:
+    app: postgres
+spec:
+  clusterIP: None  # Headless service
+  selector:
+    app: postgres
+  ports:
+  - port: 5432
+    targetPort: 5432
+    protocol: TCP

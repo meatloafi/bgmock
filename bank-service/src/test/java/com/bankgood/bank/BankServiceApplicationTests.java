@@ -1,10 +1,10 @@
-package com.bankgood.hello;
+package com.bankgood.bank;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class HelloWorldApplicationTests {
+class BankServiceApplicationTests {
 
 	@Test
 	void contextLoads() {
