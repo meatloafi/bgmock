@@ -13,10 +13,10 @@
     </parent>
     
     <groupId>com.bankgood</groupId>
-    <artifactId>hello-world</artifactId>
+    <artifactId>bank-service</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>hello-world</name>
-    <description>Hello World for Minikube</description>
+    <name>bank-service</name>
+    <description>Bank Service for Minikube</description>
     
     <properties>
         <java.version>17</java.version>
