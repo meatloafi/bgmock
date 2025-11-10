@@ -10,7 +10,6 @@ metadata:
 data:
   POSTGRES_DB: bank_a_db
   POSTGRES_USER: bank_a_user
-  # I produktion: använd Secrets istället för ConfigMap för password!
 
 ---
 # Secret: PostgreSQL Password
@@ -20,10 +19,9 @@ metadata:
   name: postgres-secret-bank-a
 type: Opaque
 stringData:
-  POSTGRES_PASSWORD: password # I produktion: generera säkert password!
+  POSTGRES_PASSWORD: password
 
 ---
-# PersistentVolumeClaim: Storage för PostgreSQL
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -33,7 +31,7 @@ spec:
     - ReadWriteOnce # Endast en pod kan skriva åt gången
   resources:
     requests:
-      storage: 10Gi # 10 GB storage
+      storage: 10Gi
 
 ---
 # StatefulSet: PostgreSQL Database
@@ -61,19 +59,16 @@ spec:
             - containerPort: 5432
               name: postgres-bank-a
 
-          # Environment variables från ConfigMap och Secret
           envFrom:
             - configMapRef:
                 name: postgres-config-bank-a
             - secretRef:
                 name: postgres-secret-bank-a
 
-          # Volume mount för persistent data
           volumeMounts:
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
-              subPath: postgres # Undvik permission issues
-
+              subPath: postgres
           # Resource limits
           resources:
             requests:
@@ -97,7 +92,7 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 3
 
-          # Readiness probe: Är PostgreSQL redo för connections?
+          # Readiness probe
           readinessProbe:
             exec:
               command:
@@ -117,7 +112,7 @@ spec:
             claimName: postgres-pvc-bank-a
 
 ---
-# Service: Exponera PostgreSQL inom Kubernetes cluster
+# Service
 apiVersion: v1
 kind: Service
 metadata:
@@ -125,7 +120,7 @@ metadata:
   labels:
     app: postgres-bank-a
 spec:
-  type: ClusterIP # Endast tillgänglig inom cluster (ej utanför)
+  type: ClusterIP
   selector:
     app: postgres-bank-a
   ports:
@@ -157,7 +152,7 @@ stringData:
   POSTGRES_PASSWORD: password
 
 ---
-# PersistentVolumeClaim: Storage för PostgreSQL
+# PersistentVolumeClaim:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -226,7 +221,7 @@ spec:
             claimName: postgres-pvc-bank-b
 
 ---
-# Service: Exponera PostgreSQL inom Kubernetes cluster
+# Service
 apiVersion: v1
 kind: Service
 metadata:
@@ -283,26 +278,36 @@ spec:
     metadata: { labels: { app: postgres-bank-c } }
     spec:
       containers:
-      - name: postgres
-        image: postgres:15-alpine
-        ports: [{ containerPort: 5432, name: "postgres-bank-c" }]
-        envFrom:
-        - configMapRef: { name: postgres-config-bank-c }
-        - secretRef: { name: postgres-secret-bank-c }
-        volumeMounts:
-        - { name: postgres-storage, mountPath: "/var/lib/postgresql/data", subPath: "postgres" }
-        resources:
-          requests: { memory: "256Mi", cpu: "250m" }
-          limits: { memory: "512Mi", cpu: "500m" }
-        livenessProbe:
-          exec: { command: ["pg_isready", "-U", "bank_c_user", "-d", "bank_c_db"] }
-          initialDelaySeconds: 30
-        readinessProbe:
-          exec: { command: ["pg_isready", "-U", "bank_c_user", "-d", "bank_c_db"] }
-          initialDelaySeconds: 10
+        - name: postgres
+          image: postgres:15-alpine
+          ports: [{ containerPort: 5432, name: "postgres-bank-c" }]
+          envFrom:
+            - configMapRef: { name: postgres-config-bank-c }
+            - secretRef: { name: postgres-secret-bank-c }
+          volumeMounts:
+            - {
+                name: postgres-storage,
+                mountPath: "/var/lib/postgresql/data",
+                subPath: "postgres",
+              }
+          resources:
+            requests: { memory: "256Mi", cpu: "250m" }
+            limits: { memory: "512Mi", cpu: "500m" }
+          livenessProbe:
+            exec:
+              {
+                command: ["pg_isready", "-U", "bank_c_user", "-d", "bank_c_db"],
+              }
+            initialDelaySeconds: 30
+          readinessProbe:
+            exec:
+              {
+                command: ["pg_isready", "-U", "bank_c_user", "-d", "bank_c_db"],
+              }
+            initialDelaySeconds: 10
       volumes:
-      - name: postgres-storage
-        persistentVolumeClaim: { claimName: postgres-pvc-bank-c }
+        - name: postgres-storage
+          persistentVolumeClaim: { claimName: postgres-pvc-bank-c }
 ---
 apiVersion: v1
 kind: Service
@@ -344,26 +349,36 @@ spec:
     metadata: { labels: { app: postgres-switch } }
     spec:
       containers:
-      - name: postgres
-        image: postgres:15-alpine
-        ports: [{ containerPort: 5432, name: "postgres-switch" }]
-        envFrom:
-        - configMapRef: { name: postgres-config-switch }
-        - secretRef: { name: postgres-secret-switch }
-        volumeMounts:
-        - { name: postgres-storage, mountPath: "/var/lib/postgresql/data", subPath: "postgres" }
-        resources:
-          requests: { memory: "256Mi", cpu: "250m" }
-          limits: { memory: "512Mi", cpu: "500m" }
-        livenessProbe:
-          exec: { command: ["pg_isready", "-U", "switch_user", "-d", "switch_db"] }
-          initialDelaySeconds: 30
-        readinessProbe:
-          exec: { command: ["pg_isready", "-U", "switch_user", "-d", "switch_db"] }
-          initialDelaySeconds: 10
+        - name: postgres
+          image: postgres:15-alpine
+          ports: [{ containerPort: 5432, name: "postgres-switch" }]
+          envFrom:
+            - configMapRef: { name: postgres-config-switch }
+            - secretRef: { name: postgres-secret-switch }
+          volumeMounts:
+            - {
+                name: postgres-storage,
+                mountPath: "/var/lib/postgresql/data",
+                subPath: "postgres",
+              }
+          resources:
+            requests: { memory: "256Mi", cpu: "250m" }
+            limits: { memory: "512Mi", cpu: "500m" }
+          livenessProbe:
+            exec:
+              {
+                command: ["pg_isready", "-U", "switch_user", "-d", "switch_db"],
+              }
+            initialDelaySeconds: 30
+          readinessProbe:
+            exec:
+              {
+                command: ["pg_isready", "-U", "switch_user", "-d", "switch_db"],
+              }
+            initialDelaySeconds: 10
       volumes:
-      - name: postgres-storage
-        persistentVolumeClaim: { claimName: postgres-pvc-switch }
+        - name: postgres-storage
+          persistentVolumeClaim: { claimName: postgres-pvc-switch }
 ---
 apiVersion: v1
 kind: Service
