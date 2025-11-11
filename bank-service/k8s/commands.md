@@ -13,9 +13,9 @@ $ PASSWORD=$(openssl rand -base64 32)
 
 ```bash
 # Make code changes → Build → Push → Restart
-docker build -t bank-a:latest .
-docker tag bank-a:latest localhost:5000/bank-a:latest
-docker push localhost:5000/bank-a:latest
+docker build -t bank-service:latest .
+docker tag bank-service:latest localhost:5000/bank-service:latest
+docker push localhost:5000/bank-service:latest
 kubectl rollout restart deployment/bankgood-bank
 kubectl logs -f deployment/bankgood-bank
 ```
@@ -47,7 +47,7 @@ kubectl get deployments
 kubectl get deployments -n kafka
 
 # Detailed info about a deployment
-kubectl describe deployment bankgood-bank
+kubectl describe deployment bank-service
 
 # Watch deployments in real-time
 kubectl get deployments --watch
@@ -68,20 +68,20 @@ kubectl apply -f k8s/01-shared/ -f k8s/02-banks/
 ### Update Deployment
 ```bash
 # Edit deployment live (opens editor)
-kubectl edit deployment bankgood-bank
+kubectl edit deployment bank-service
 
 # Change image directly
-kubectl set image deployment/bankgood-bank \
+kubectl set image deployment/bank-service \
   bank-service=localhost:5000/bank-a:v2
 
 # Rollout restart (restart all pods)
-kubectl rollout restart deployment/bankgood-bank
+kubectl rollout restart deployment/bank-service
 ```
 
 ### Delete Deployment
 ```bash
 # Delete specific deployment
-kubectl delete deployment bankgood-bank
+kubectl delete deployment bank-service
 
 # Delete from file
 kubectl delete -f k8s/02-banks/bank-a/deployment.yaml
@@ -106,7 +106,7 @@ kubectl get pods -n kafka
 kubectl get pods -o wide
 
 # Describe pod
-kubectl describe pod bankgood-bank-xxxxx
+kubectl describe pod bank-service-xxxxx
 ```
 
 ### Pod Logs
@@ -124,16 +124,16 @@ kubectl logs pod-name --tail=100
 kubectl logs pod-name -c container-name
 
 # Logs from all pods in deployment
-kubectl logs deployment/bankgood-bank
+kubectl logs deployment/bank-service
 ```
 
 ### Delete Pods
 ```bash
 # Delete specific pod (will restart automatically)
-kubectl delete pod bankgood-bank-xxxxx
+kubectl delete pod bank-service-xxxxx
 
 # Delete all pods for deployment (triggers restart)
-kubectl delete pod -l app=bankgood-bank
+kubectl delete pod -l app=bank-service
 ```
 
 ### Access Pod
@@ -158,7 +158,7 @@ kubectl port-forward pod-name 8080:8080
 kubectl get svc
 
 # Get service details
-kubectl describe svc bankgood-bank
+kubectl describe svc bank-service
 
 # Get service with external IP
 kubectl get svc -o wide
@@ -167,13 +167,13 @@ kubectl get svc -o wide
 ### Port Forward
 ```bash
 # Forward local port to service
-kubectl port-forward svc/bankgood-bank 8080:8080
+kubectl port-forward svc/bank-service 8080:8080
 
 # Forward to pod
-kubectl port-forward pod/bankgood-bank-xxxxx 8080:8080
+kubectl port-forward pod/bank-service-xxxxx 8080:8080
 
 # Forward to different local port
-kubectl port-forward svc/bankgood-bank 3000:8080
+kubectl port-forward svc/bank-service 3000:8080
 ```
 
 ---
@@ -198,11 +198,11 @@ docker push localhost:5000/bank-a:v2
 ### Step 3: Update Deployment
 ```bash
 # Option A: Change image
-kubectl set image deployment/bankgood-bank \
+kubectl set image deployment/bank-service \
   bank-service=localhost:5000/bank-a:v2
 
 # Option B: Edit deployment
-kubectl edit deployment bankgood-bank
+kubectl edit deployment bank-service
 # Change image: localhost:5000/bank-a:v2
 # Save (Ctrl+S, then exit)
 ```
@@ -210,13 +210,13 @@ kubectl edit deployment bankgood-bank
 ### Step 4: Verify Rollout
 ```bash
 # Watch rollout progress
-kubectl rollout status deployment/bankgood-bank
+kubectl rollout status deployment/bank-service
 
 # Check history of rollouts
-kubectl rollout history deployment/bankgood-bank
+kubectl rollout history deployment/bank-service
 
 # Rollback to previous version
-kubectl rollout undo deployment/bankgood-bank
+kubectl rollout undo deployment/bank-service
 ```
 
 ---
@@ -301,13 +301,13 @@ kubectl logs pod-name
 kubectl logs pod-name --previous
 
 # Follow logs in real-time
-kubectl logs -f deployment/bankgood-bank
+kubectl logs -f deployment/bank-service
 ```
 
 ### Test Connectivity
 ```bash
 # Port forward and curl
-kubectl port-forward svc/bankgood-bank 8080:8080
+kubectl port-forward svc/bank-service 8080:8080
 curl http://localhost:8080/api/accounts
 
 # Exec into pod and test
@@ -335,13 +335,13 @@ docker tag bank-a:latest localhost:5000/bank-a:latest
 docker push localhost:5000/bank-a:latest
 
 # 3. Restart deployment (pulls new image)
-kubectl rollout restart deployment/bankgood-bank
+kubectl rollout restart deployment/bank-service
 
 # 4. Watch rollout
-kubectl rollout status deployment/bankgood-bank
+kubectl rollout status deployment/bank-service
 
 # 5. Check logs
-kubectl logs -f deployment/bankgood-bank
+kubectl logs -f deployment/bank-service
 ```
 
 ### Delete Everything
@@ -371,7 +371,7 @@ kubectl logs pod-name
 kubectl logs pod-name --previous
 
 # 5. Port forward and test
-kubectl port-forward svc/bankgood-bank 8080:8080
+kubectl port-forward svc/bank-service 8080:8080
 curl http://localhost:8080/health
 ```
 
@@ -395,7 +395,7 @@ alias kpf="kubectl port-forward"
 Then use:
 ```bash
 k get pods
-klog deployment/bankgood-bank
+klog deployment/bank-service
 kex pod-name -- /bin/bash
 ```
 
@@ -417,7 +417,7 @@ kubectl delete all --all
 watch kubectl get pods
 
 # Get resource YAML
-kubectl get deployment bankgood-bank -o yaml
+kubectl get deployment bank-service -o yaml
 
 # Apply with dry-run (see what would happen)
 kubectl apply -f deployment.yaml --dry-run=client
