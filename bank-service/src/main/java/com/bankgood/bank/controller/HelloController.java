@@ -1,4 +1,4 @@
-package com.bankgood.hello;
+package com.bankgood.bank.controller;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -13,6 +13,6 @@ public class HelloController {
     
     @GetMapping("/health")
     public String health() {
-        return "Health is OK";
+        return "OK";
     }
 }

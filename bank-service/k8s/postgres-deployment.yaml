@@ -10,7 +10,6 @@ metadata:
 data:
   POSTGRES_DB: bankgood
   POSTGRES_USER: bankgood
-  # I produktion: använd Secrets istället för ConfigMap för password!
 
 ---
 # Secret: PostgreSQL Password
@@ -20,7 +19,7 @@ metadata:
   name: postgres-secret
 type: Opaque
 stringData:
-  POSTGRES_PASSWORD: bankgood123  # I produktion: generera säkert password!
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  
 
 ---
 # PersistentVolumeClaim: Storage för PostgreSQL
@@ -30,7 +29,7 @@ metadata:
   name: postgres-pvc
 spec:
   accessModes:
-    - ReadWriteOnce  # Endast en pod kan skriva åt gången
+    - ReadWriteOnce  
   resources:
     requests:
       storage: 10Gi  # 10 GB storage
@@ -44,8 +43,8 @@ metadata:
   labels:
     app: postgres
 spec:
-  serviceName: postgres-service  # Headless service name
-  replicas: 1  # En PostgreSQL instans (för enkelhetens skull)
+  serviceName: postgres-service  
+  replicas: 1  
   selector:
     matchLabels:
       app: postgres
@@ -72,7 +71,7 @@ spec:
         volumeMounts:
         - name: postgres-storage
           mountPath: /var/lib/postgresql/data
-          subPath: postgres  # Undvik permission issues
+          subPath: postgres  
         
         # Resource limits
         resources:
