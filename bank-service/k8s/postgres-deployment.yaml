@@ -6,7 +6,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: postgres-config
+  name: postgres-config-bank-a
 data:
   POSTGRES_DB: bankgood
   POSTGRES_USER: bankgood
@@ -16,133 +16,374 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: postgres-secret
+  name: postgres-secret-bank-a
 type: Opaque
 stringData:
   POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  
 
 ---
-# PersistentVolumeClaim: Storage för PostgreSQL
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: postgres-pvc
+  name: postgres-pvc-bank-a
 spec:
   accessModes:
     - ReadWriteOnce  
   resources:
     requests:
-      storage: 10Gi  # 10 GB storage
+      storage: 10Gi
 
 ---
 # StatefulSet: PostgreSQL Database
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: postgres
+  name: postgres-bank-a
   labels:
-    app: postgres
+    app: postgres-bank-a
 spec:
-  serviceName: postgres-service  
-  replicas: 1  
+  serviceName: postgres-service-bank-a # Headless service name
+  replicas: 1 # En PostgreSQL instans (för enkelhetens skull)
   selector:
     matchLabels:
-      app: postgres
+      app: postgres-bank-a
   template:
     metadata:
       labels:
-        app: postgres
+        app: postgres-bank-a
     spec:
       containers:
-      - name: postgres
-        image: postgres:15-alpine  # Lightweight PostgreSQL image
-        ports:
-        - containerPort: 5432
-          name: postgres
-        
-        # Environment variables från ConfigMap och Secret
-        envFrom:
-        - configMapRef:
-            name: postgres-config
-        - secretRef:
-            name: postgres-secret
-        
-        # Volume mount för persistent data
-        volumeMounts:
-        - name: postgres-storage
-          mountPath: /var/lib/postgresql/data
-          subPath: postgres  
-        
-        # Resource limits
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        
-        # Liveness probe: Är PostgreSQL vid liv?
-        livenessProbe:
-          exec:
-            command:
-            - pg_isready
-            - -U
-            - bankgood
-          initialDelaySeconds: 30
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        
-        # Readiness probe: Är PostgreSQL redo för connections?
-        readinessProbe:
-          exec:
-            command:
-            - pg_isready
-            - -U
-            - bankgood
-          initialDelaySeconds: 10
-          periodSeconds: 5
-          timeoutSeconds: 3
-          failureThreshold: 3
-      
+        - name: postgres
+          image: postgres:15-alpine # Lightweight PostgreSQL image
+          ports:
+            - containerPort: 5432
+              name: postgres-bank-a
+
+          envFrom:
+            - configMapRef:
+                name: postgres-config-bank-a
+            - secretRef:
+                name: postgres-secret-bank-a
+
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+              subPath: postgres
+          # Resource limits
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+          # Liveness probe: Är PostgreSQL vid liv?
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - bank_a_user
+                - -d
+                - bank_a_db
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          # Readiness probe
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - bank_a_user
+                - -d
+                - bank_a_db
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+
       volumes:
-      - name: postgres-storage
-        persistentVolumeClaim:
-          claimName: postgres-pvc
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc-bank-a
 
 ---
-# Service: Exponera PostgreSQL inom Kubernetes cluster
+# Service
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres-service
+  name: postgres-service-bank-a
   labels:
-    app: postgres
+    app: postgres-bank-a
 spec:
-  type: ClusterIP  # Endast tillgänglig inom cluster (ej utanför)
+  type: ClusterIP
   selector:
-    app: postgres
+    app: postgres-bank-a
   ports:
-  - port: 5432      # Service port
-    targetPort: 5432  # Container port
-    protocol: TCP
-    name: postgres
+    - port: 5432 # Service port
+      targetPort: 5432 # Container port
+      protocol: TCP
+      name: postgres
 
 ---
-# OPTIONAL: Headless Service för StatefulSet
-# (Används om du vill ha direct pod access)
+# --- BANK B ---
+
+# ConfigMap: PostgreSQL Configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config-bank-b
+data:
+  POSTGRES_DB: bank_b_db
+  POSTGRES_USER: bank_b_user
+
+---
+# Secret: PostgreSQL Password
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret-bank-b
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: password
+
+---
+# PersistentVolumeClaim:
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc-bank-b
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# StatefulSet: PostgreSQL Database
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-bank-b
+  labels:
+    app: postgres-bank-b
+spec:
+  serviceName: postgres-service-bank-b
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-bank-b
+  template:
+    metadata:
+      labels:
+        app: postgres-bank-b
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres-bank-b
+          envFrom:
+            - configMapRef:
+                name: postgres-config-bank-b
+            - secretRef:
+                name: postgres-secret-bank-b
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+              subPath: postgres
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "bank_b_user", "-d", "bank_b_db"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "bank_b_user", "-d", "bank_b_db"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc-bank-b
+
+---
+# Service
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres-headless
+  name: postgres-service-bank-b
   labels:
-    app: postgres
+    app: postgres-bank-b
 spec:
-  clusterIP: None  # Headless service
+  type: ClusterIP
   selector:
-    app: postgres
+    app: postgres-bank-b
   ports:
-  - port: 5432
-    targetPort: 5432
-    protocol: TCP
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+      name: postgres
+
+---
+# --- BANK C ---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-config-bank-c
+data:
+  POSTGRES_DB: bank_c_db
+  POSTGRES_USER: bank_c_user
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-secret-bank-c
+type: Opaque
+stringData:
+  POSTGRES_PASSWORD: password
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc-bank-c
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources: { requests: { storage: "10Gi" } }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-bank-c
+  labels: { app: postgres-bank-c }
+spec:
+  serviceName: postgres-service-bank-c
+  replicas: 1
+  selector: { matchLabels: { app: postgres-bank-c } }
+  template:
+    metadata: { labels: { app: postgres-bank-c } }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports: [{ containerPort: 5432, name: "postgres-bank-c" }]
+          envFrom:
+            - configMapRef: { name: postgres-config-bank-c }
+            - secretRef: { name: postgres-secret-bank-c }
+          volumeMounts:
+            - {
+                name: postgres-storage,
+                mountPath: "/var/lib/postgresql/data",
+                subPath: "postgres",
+              }
+          resources:
+            requests: { memory: "256Mi", cpu: "250m" }
+            limits: { memory: "512Mi", cpu: "500m" }
+          livenessProbe:
+            exec:
+              {
+                command: ["pg_isready", "-U", "bank_c_user", "-d", "bank_c_db"],
+              }
+            initialDelaySeconds: 30
+          readinessProbe:
+            exec:
+              {
+                command: ["pg_isready", "-U", "bank_c_user", "-d", "bank_c_db"],
+              }
+            initialDelaySeconds: 10
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim: { claimName: postgres-pvc-bank-c }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: postgres-service-bank-c, labels: { app: postgres-bank-c } }
+spec:
+  type: ClusterIP
+  selector: { app: postgres-bank-c }
+  ports: [{ port: 5432, targetPort: 5432, protocol: TCP, name: "postgres" }]
+
+---
+# --- SWITCH ---
+
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: postgres-config-switch }
+data: { POSTGRES_DB: "switch_db", POSTGRES_USER: "switch_user" }
+---
+apiVersion: v1
+kind: Secret
+metadata: { name: postgres-secret-switch }
+type: Opaque
+stringData: { POSTGRES_PASSWORD: "password" }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: postgres-pvc-switch }
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources: { requests: { storage: "10Gi" } }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: postgres-switch, labels: { app: postgres-switch } }
+spec:
+  serviceName: postgres-service-switch
+  replicas: 1
+  selector: { matchLabels: { app: postgres-switch } }
+  template:
+    metadata: { labels: { app: postgres-switch } }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15-alpine
+          ports: [{ containerPort: 5432, name: "postgres-switch" }]
+          envFrom:
+            - configMapRef: { name: postgres-config-switch }
+            - secretRef: { name: postgres-secret-switch }
+          volumeMounts:
+            - {
+                name: postgres-storage,
+                mountPath: "/var/lib/postgresql/data",
+                subPath: "postgres",
+              }
+          resources:
+            requests: { memory: "256Mi", cpu: "250m" }
+            limits: { memory: "512Mi", cpu: "500m" }
+          livenessProbe:
+            exec:
+              {
+                command: ["pg_isready", "-U", "switch_user", "-d", "switch_db"],
+              }
+            initialDelaySeconds: 30
+          readinessProbe:
+            exec:
+              {
+                command: ["pg_isready", "-U", "switch_user", "-d", "switch_db"],
+              }
+            initialDelaySeconds: 10
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim: { claimName: postgres-pvc-switch }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: postgres-service-switch, labels: { app: postgres-switch } }
+spec:
+  type: ClusterIP
+  selector: { app: postgres-switch }
+  ports: [{ port: 5432, targetPort: 5432, protocol: TCP, name: "postgres" }]
