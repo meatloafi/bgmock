@@ -8,8 +8,8 @@ kind: ConfigMap
 metadata:
   name: postgres-config-bank-a
 data:
-  POSTGRES_DB: bank_a_db
-  POSTGRES_USER: bank_a_user
+  POSTGRES_DB: bankgood
+  POSTGRES_USER: bankgood
 
 ---
 # Secret: PostgreSQL Password
@@ -19,7 +19,7 @@ metadata:
   name: postgres-secret-bank-a
 type: Opaque
 stringData:
-  POSTGRES_PASSWORD: password
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}  
 
 ---
 apiVersion: v1
@@ -28,7 +28,7 @@ metadata:
   name: postgres-pvc-bank-a
 spec:
   accessModes:
-    - ReadWriteOnce # Endast en pod kan skriva åt gången
+    - ReadWriteOnce  
   resources:
     requests:
       storage: 10Gi
