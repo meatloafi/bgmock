@@ -1,424 +1,135 @@
-# Kubernetes Commands - Quick Reference
+# Kubernetes Quick Reference
 
-## Essential kubectl Commands
+## Pod Management
 
-
-### Generate password for postgres 
-
+**List all pods**
 ```bash
-$ PASSWORD=$(openssl rand -base64 32)
-```
-
-### Update docker image and push
-
-```bash
-# Make code changes → Build → Push → Restart
-docker build -t bank-service:latest .
-docker tag bank-service:latest localhost:5000/bank-service:latest
-docker push localhost:5000/bank-service:latest
-kubectl rollout restart deployment/bankgood-bank
-kubectl logs -f deployment/bankgood-bank
-```
-
---- 
-
-### Cluster Info
-```bash
-# Check cluster status
-kubectl cluster-info
-
-# Get nodes
-kubectl get nodes
-
-# Get namespaces
-kubectl get namespaces
-```
-
----
-
-## Deployments
-
-### View Deployments
-```bash
-# List all deployments
-kubectl get deployments
-
-# List deployments in specific namespace
-kubectl get deployments -n kafka
-
-# Detailed info about a deployment
-kubectl describe deployment bank-service
-
-# Watch deployments in real-time
-kubectl get deployments --watch
-```
-
-### Deploy/Apply
-```bash
-# Deploy from YAML file
-kubectl apply -f k8s/02-banks/bank-a/deployment.yaml
-
-# Deploy entire folder
-kubectl apply -f k8s/02-banks/
-
-# Deploy multiple files
-kubectl apply -f k8s/01-shared/ -f k8s/02-banks/
-```
-
-### Update Deployment
-```bash
-# Edit deployment live (opens editor)
-kubectl edit deployment bank-service
-
-# Change image directly
-kubectl set image deployment/bank-service \
-  bank-service=localhost:5000/bank-a:v2
-
-# Rollout restart (restart all pods)
-kubectl rollout restart deployment/bank-service
-```
-
-### Delete Deployment
-```bash
-# Delete specific deployment
-kubectl delete deployment bank-service
-
-# Delete from file
-kubectl delete -f k8s/02-banks/bank-a/deployment.yaml
-
-# Delete everything in folder
-kubectl delete -f k8s/02-banks/
-```
-
----
-
-## Pods
-
-### View Pods
-```bash
-# List all pods
 kubectl get pods
-
-# List pods in namespace
-kubectl get pods -n kafka
-
-# Get pod with more details
-kubectl get pods -o wide
-
-# Describe pod
-kubectl describe pod bank-service-xxxxx
 ```
 
-### Pod Logs
+**Get pod details**
 ```bash
-# View logs
-kubectl logs pod-name
-
-# Follow logs (like tail -f)
-kubectl logs -f pod-name
-
-# Last 100 lines
-kubectl logs pod-name --tail=100
-
-# Logs from specific container in pod
-kubectl logs pod-name -c container-name
-
-# Logs from all pods in deployment
-kubectl logs deployment/bank-service
+kubectl describe pod <pod-name>
 ```
 
-### Delete Pods
+**View pod logs**
 ```bash
-# Delete specific pod (will restart automatically)
-kubectl delete pod bank-service-xxxxx
-
-# Delete all pods for deployment (triggers restart)
-kubectl delete pod -l app=bank-service
+kubectl logs <pod-name>
 ```
 
-### Access Pod
+**View logs in real-time**
 ```bash
-# Shell into pod
-kubectl exec -it pod-name -- /bin/bash
-
-# Run command in pod
-kubectl exec pod-name -- command-here
-
-# Port forward to pod
-kubectl port-forward pod-name 8080:8080
+kubectl logs -f <pod-name>
 ```
 
----
-
-## Services
-
-### View Services
+**Previous logs (if pod crashed)**
 ```bash
-# List services
-kubectl get svc
-
-# Get service details
-kubectl describe svc bank-service
-
-# Get service with external IP
-kubectl get svc -o wide
+kubectl logs <pod-name> -p
 ```
 
-### Port Forward
+**Execute command in pod**
 ```bash
-# Forward local port to service
-kubectl port-forward svc/bank-service 8080:8080
-
-# Forward to pod
-kubectl port-forward pod/bank-service-xxxxx 8080:8080
-
-# Forward to different local port
-kubectl port-forward svc/bank-service 3000:8080
+kubectl exec -it <pod-name> -- <command>
 ```
 
----
+## Deployments & Rollouts
 
-## Updating Images (Workflow)
-
-### Step 1: Build New Image
+**List deployments**
 ```bash
-# Build locally
-docker build -t bank-a:v2 .
+kubectl get deployments
 ```
 
-### Step 2: Push to Registry
+**Restart a deployment**
 ```bash
-# Tag for minikube registry
-docker tag bank-a:v2 localhost:5000/bank-a:v2
-
-# Push
-docker push localhost:5000/bank-a:v2
+kubectl rollout restart deployment/<deployment-name>
 ```
 
-### Step 3: Update Deployment
+**Check rollout status**
 ```bash
-# Option A: Change image
-kubectl set image deployment/bank-service \
-  bank-service=localhost:5000/bank-a:v2
-
-# Option B: Edit deployment
-kubectl edit deployment bank-service
-# Change image: localhost:5000/bank-a:v2
-# Save (Ctrl+S, then exit)
+kubectl rollout status deployment/<deployment-name>
 ```
 
-### Step 4: Verify Rollout
+**Update image**
 ```bash
-# Watch rollout progress
-kubectl rollout status deployment/bank-service
-
-# Check history of rollouts
-kubectl rollout history deployment/bank-service
-
-# Rollback to previous version
-kubectl rollout undo deployment/bank-service
+kubectl set image deployment/<deployment-name> <container-name>=<image>:<tag>
 ```
 
----
-
-## ConfigMaps & Secrets
-
-### View
+**Apply/update from YAML**
 ```bash
-# List configmaps
-kubectl get configmap
-
-# View configmap contents
-kubectl describe configmap bank-a-config
-
-# Get as YAML
-kubectl get configmap bank-a-config -o yaml
+kubectl apply -f <file.yaml>
 ```
 
-### Create/Update
+## Database Access
+
+**Connect to PostgreSQL pod**
 ```bash
-# Create from file
-kubectl create configmap bank-a-config --from-file=application.yml
-
-# Delete and recreate
-kubectl delete configmap bank-a-config
-kubectl create configmap bank-a-config --from-file=application.yml
+kubectl exec -it <postgres-pod-name> -- psql -U <user> -d <database>
 ```
 
----
+**List tables**
+```sql
+\dt
+```
 
-## Namespaces
+**Describe table**
+```sql
+\d <table-name>
+```
 
-### Create Namespace
+**Exit psql**
+```sql
+\q
+```
+
+## Useful Queries
+
+**Get all resources**
 ```bash
-# Create
-kubectl create namespace bank-a
-
-# Apply from file
-kubectl apply -f k8s/01-shared/namespace.yaml
+kubectl get all
 ```
 
-### Use Namespace
+**Get StatefulSets**
 ```bash
-# Get pods in specific namespace
-kubectl get pods -n bank-a
-
-# Set default namespace (avoid -n flag)
-kubectl config set-context --current --namespace=bank-a
-
-# Get current namespace
-kubectl config view | grep namespace
+kubectl get statefulsets
 ```
 
-### Delete Namespace
+**Get services**
 ```bash
-# Delete entire namespace (deletes all resources in it)
-kubectl delete namespace bank-a
+kubectl get services
 ```
 
----
+**Delete a pod (will restart if in deployment)**
+```bash
+kubectl delete pod <pod-name>
+```
 
 ## Debugging
 
-### Check Status
+**Describe resource (see events)**
 ```bash
-# Get events (what went wrong?)
-kubectl get events --sort-by='.lastTimestamp'
-
-# Describe for detailed error info
-kubectl describe pod pod-name
-
-# Check deployment status
-kubectl get deployment -o wide
+kubectl describe <resource-type> <resource-name>
 ```
 
-### View Logs
+**Port forward to local machine**
 ```bash
-# Current pod logs
-kubectl logs pod-name
-
-# Previous pod logs (if pod crashed and restarted)
-kubectl logs pod-name --previous
-
-# Follow logs in real-time
-kubectl logs -f deployment/bank-service
+kubectl port-forward <pod-name> 8080:8080
 ```
-
-### Test Connectivity
-```bash
-# Port forward and curl
-kubectl port-forward svc/bank-service 8080:8080
-curl http://localhost:8080/api/accounts
-
-# Exec into pod and test
-kubectl exec -it pod-name -- curl http://another-service:8080
-```
-
----
 
 ## Common Workflows
 
-### Deploy Everything
+**Deploy changes after rebuilding Docker image:**
+1. `eval $(minikube docker-env)` — Use Minikube's Docker
+2. `docker build -t your-app:latest .` — Build image
+3. `kubectl rollout restart deployment/your-app` — Restart pods
+
+**Check if app is healthy:**
 ```bash
-kubectl apply -f k8s/01-shared/
-kubectl apply -f k8s/02-banks/
-kubectl apply -f k8s/03-switch/
+kubectl logs <pod-name> | tail -20
+kubectl describe pod <pod-name>  # Check Events section
 ```
 
-### Update Bank A Code
+**Recover database:**
 ```bash
-# 1. Build new image
-docker build -t bank-a:latest .
-
-# 2. Push to registry
-docker tag bank-a:latest localhost:5000/bank-a:latest
-docker push localhost:5000/bank-a:latest
-
-# 3. Restart deployment (pulls new image)
-kubectl rollout restart deployment/bank-service
-
-# 4. Watch rollout
-kubectl rollout status deployment/bank-service
-
-# 5. Check logs
-kubectl logs -f deployment/bank-service
-```
-
-### Delete Everything
-```bash
-# Delete all deployments
-kubectl delete -f k8s/
-
-# Delete specific namespace
-kubectl delete namespace bank-a
-
-# Start fresh
-kubectl apply -f k8s/
-```
-
-### Troubleshoot Crashing Pod
-```bash
-# 1. Check pod status
-kubectl get pods
-
-# 2. Describe pod for error
-kubectl describe pod pod-name
-
-# 3. Check logs
-kubectl logs pod-name
-
-# 4. Check previous logs (if crashed)
-kubectl logs pod-name --previous
-
-# 5. Port forward and test
-kubectl port-forward svc/bank-service 8080:8080
-curl http://localhost:8080/health
-```
-
----
-
-## Quick Aliases
-
-Add to your `.bashrc` or PowerShell profile:
-
-```bash
-alias k=kubectl
-alias kgp="kubectl get pods"
-alias kgd="kubectl get deployments"
-alias kgn="kubectl get namespaces"
-alias kdel="kubectl delete"
-alias klog="kubectl logs -f"
-alias kex="kubectl exec -it"
-alias kpf="kubectl port-forward"
-```
-
-Then use:
-```bash
-k get pods
-klog deployment/bank-service
-kex pod-name -- /bin/bash
-```
-
----
-
-## Helpful One-Liners
-
-```bash
-# Get all resources
-kubectl get all
-
-# Get all in namespace
-kubectl get all -n kafka
-
-# Delete everything (careful!)
-kubectl delete all --all
-
-# Watch pods
-watch kubectl get pods
-
-# Get resource YAML
-kubectl get deployment bank-service -o yaml
-
-# Apply with dry-run (see what would happen)
-kubectl apply -f deployment.yaml --dry-run=client
+kubectl delete pod <db-pod-name>
+kubectl logs <app-pod-name>  # Wait for app to reconnect
 ```
