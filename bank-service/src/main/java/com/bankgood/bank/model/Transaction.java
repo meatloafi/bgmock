@@ -18,6 +18,7 @@ import lombok.*;
 public class Transaction {
 
     @Id
+    @Column(unique = true)
     private UUID transactionId;
 
     @Column(nullable = false)

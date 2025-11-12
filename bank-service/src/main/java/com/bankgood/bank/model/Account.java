@@ -18,10 +18,7 @@ public class Account {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
-
-    @Column(nullable = false)
-    private String clearingNumber;
+    private UUID accountId;
 
     @Column(unique = true, nullable = false)
     private String accountNumber;
