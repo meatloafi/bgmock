@@ -31,10 +31,7 @@ public class Transaction {
     private String fromAccountNumber;
 
     @Column(nullable = false)
-    private String toClearingNumber;
-
-    @Column(nullable = false)
-    private String toAccountNumber;
+    private String toBankgoodNumber;
 
     @Column(nullable = false)
     private BigDecimal amount;
