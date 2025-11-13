@@ -53,9 +53,9 @@ public class TransactionService {
         // Skapa transaktionen
         Transaction tx = new Transaction();
         tx.setTransactionId(UUID.randomUUID());
-        tx.setFromAccountId(fromAccount.getAccountId().toString());
+        tx.setFromAccountId(fromAccount.getAccountId());
         tx.setFromAccountNumber(fromAccountNumber);
-        tx.setFromClearingNumber("000001"); // ta ev. från ENV
+        tx.setFromClearingNumber("000001"); // ta ev. från ENV TODO
         tx.setToBankgoodNumber(toClearingNumber);
         tx.setAmount(amount);
         tx.setStatus(TransactionStatus.PENDING);
@@ -100,7 +100,7 @@ public class TransactionService {
         Transaction tx = transactionRepository.findById(response.getTransactionId())
                 .orElseThrow(() -> new RuntimeException("Transaction not found"));
 
-        if ("FAILED".equalsIgnoreCase(response.getStatus())) {
+        if ("FAILED".equalsIgnoreCase(response.getStatus().toString())) {
             // Kompenserande rollback
             Account fromAccount = accountRepository.findByAccountNumber(tx.getFromAccountNumber())
                     .orElseThrow(() -> new RuntimeException("Sender account not found"));
@@ -108,7 +108,7 @@ public class TransactionService {
             accountRepository.save(fromAccount);
         }
 
-        tx.setStatus("SUCCESS".equalsIgnoreCase(response.getStatus()) ?
+        tx.setStatus("SUCCESS".equalsIgnoreCase(response.getStatus().toString()) ?
                 TransactionStatus.SUCCESS : TransactionStatus.FAILED);
         tx.setUpdatedAt(LocalDateTime.now());
         transactionRepository.save(tx);
