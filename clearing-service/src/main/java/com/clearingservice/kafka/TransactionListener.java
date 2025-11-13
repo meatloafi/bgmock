@@ -2,7 +2,7 @@ package com.clearingservice.kafka;
 
 import com.clearingservice.event.TransactionEvent;
 import com.clearingservice.event.TransactionResponseEvent;
-import com.clearingservice.service.ClearingTransactionService;
+import com.clearingservice.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -11,7 +11,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class TransactionListener {
 
-    private final ClearingTransactionService service;
+    private final TransactionService service;
 
     // Lyssnar på inkommande transaktioner från banker
     @KafkaListener(topics = "transactions.outgoing", groupId = "clearing-service")

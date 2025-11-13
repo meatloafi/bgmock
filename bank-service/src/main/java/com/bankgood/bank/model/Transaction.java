@@ -18,9 +18,10 @@ import lombok.*;
 public class Transaction {
 
     @Id
-    @GeneratedValue
-    @Column(unique = true)
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(unique = true, updatable = false, nullable = false)
     private UUID transactionId;
+
 
     @Column(nullable = false)
     private UUID fromAccountId;

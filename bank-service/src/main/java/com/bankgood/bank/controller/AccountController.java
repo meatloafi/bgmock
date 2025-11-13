@@ -3,9 +3,12 @@ package com.bankgood.bank.controller;
 import com.bankgood.bank.model.Account;
 import com.bankgood.bank.service.AccountService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
@@ -17,8 +20,9 @@ public class AccountController {
     private final AccountService accountService;
 
     @PostMapping
-    public ResponseEntity<Account> createAccount(@RequestBody Account account) {
-        return ResponseEntity.ok(accountService.createAccount(account));
+    public ResponseEntity<Account> createAccount(@Valid @RequestBody Account account) {
+        Account created = accountService.createAccount(account);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     @GetMapping("/{id}")
@@ -32,7 +36,7 @@ public class AccountController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Account> updateAccount(@PathVariable UUID id, @RequestBody Account account) {
+    public ResponseEntity<Account> updateAccount(@PathVariable UUID id, @Valid @RequestBody Account account) {
         account.setAccountId(id);
         return ResponseEntity.ok(accountService.updateAccount(account));
     }
@@ -40,6 +44,13 @@ public class AccountController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAccount(@PathVariable UUID id) {
         accountService.deleteAccount(id);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
+    }
+
+    // Endpoint för att justera saldo (positivt eller negativt)
+    @PostMapping("/{id}/adjust")
+    public ResponseEntity<Account> adjustBalance(@PathVariable UUID id, @RequestParam BigDecimal amount) {
+        accountService.adjustBalance(id, amount);
+        return ResponseEntity.ok(accountService.getAccount(id));
     }
 }

@@ -14,17 +14,20 @@ public class TransactionResponseListener {
 
     private final TransactionService transactionService;
 
-    @KafkaListener(topics = "transactions.response", groupId = "bank-service")
-    public void listen(TransactionResponseEvent response) {
-        log.info("📥 Mottog TransactionResponseEvent från Kafka: {}", response);
+    @KafkaListener(
+            topics = "transactions.response", // Response från clearing-service
+            groupId = "bank-service",
+            containerFactory = "responseListenerFactory"
+    )
+    public void listenTransactionResponse(TransactionResponseEvent response) {
+        log.info("📥 Mottog TransactionResponseEvent från clearing-service: {}", response.getTransactionId());
 
         try {
+            // Bank A hanterar inkommande response
             transactionService.handleTransactionResponse(response);
-            log.info("✅ Transaction {} uppdaterad via Kafka med status: {}",
-                    response.getTransactionId(), response.getStatus());
+            log.info("✅ Transaction {} uppdaterad med status: {}", response.getTransactionId(), response.getStatus());
         } catch (Exception e) {
-            log.error("❌ Fel vid hantering av TransactionResponseEvent {}: {}",
-                    response.getTransactionId(), e.getMessage(), e);
+            log.error("❌ Fel vid hantering av TransactionResponseEvent {}: {}", response.getTransactionId(), e.getMessage(), e);
         }
     }
 }

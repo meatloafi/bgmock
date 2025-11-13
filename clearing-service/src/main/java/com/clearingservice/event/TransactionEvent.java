@@ -14,11 +14,11 @@ import java.util.UUID;
 @AllArgsConstructor
 public class TransactionEvent {
     private UUID transactionId;
-    private String fromAccountId;
+    private UUID fromAccountId;
     private String fromClearingNumber;
     private String fromAccountNumber;
-    private String toClearingNumber;
-    private String toAccountNumber;
+    private String toClearingNumber; // Fylls via lookup
+    private String toAccountNumber; // Fylls via lookup
     private BigDecimal amount;
     private TransactionStatus status;
     private LocalDateTime createdAt;
