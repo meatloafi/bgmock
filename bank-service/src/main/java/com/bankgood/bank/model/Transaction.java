@@ -18,11 +18,12 @@ import lombok.*;
 public class Transaction {
 
     @Id
+    @GeneratedValue
     @Column(unique = true)
     private UUID transactionId;
 
     @Column(nullable = false)
-    private String fromAccountId;
+    private UUID fromAccountId;
 
     @Column(nullable = false)
     private String fromClearingNumber;
