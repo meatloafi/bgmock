@@ -17,7 +17,8 @@ public class TransactionEvent {
     private String fromAccountId;
     private String fromClearingNumber;
     private String fromAccountNumber;
-    private String toBankgoodNumber;
+    private String toClearingNumber;
+    private String toAccountNumber;
     private BigDecimal amount;
     private TransactionStatus status;
     private LocalDateTime createdAt;

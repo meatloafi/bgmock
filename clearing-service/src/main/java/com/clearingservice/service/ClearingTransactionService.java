@@ -31,6 +31,7 @@ public class ClearingTransactionService {
 
     @Transactional
     public void processIncomingTransaction(TransactionEvent dto) {
+        //TODO, Gör en slags lookup för att översätta bankgood number till clearing och account number.
         // Spara PENDING i DB
         ClearingTransaction tx = new ClearingTransaction();
         tx.setTransactionId(dto.getTransactionId());
@@ -57,7 +58,7 @@ public class ClearingTransactionService {
 
             TransactionResponseEvent response = new TransactionResponseEvent(
                     dto.getTransactionId(),
-                    "FAILED",
+                    TransactionStatus.FAILED,
                     "Recipient bank unknown"
             );
             kafkaTemplate.send(RESPONSE_TOPIC, response);
@@ -74,7 +75,7 @@ public class ClearingTransactionService {
                 .orElseThrow(() -> new RuntimeException("Transaction not found"));
 
         tx.setStatus("SUCCESS".equals(response.getStatus()) ? TransactionStatus.SUCCESS : TransactionStatus.FAILED);
-        tx.setFailureReason(response.getFailureReason());
+        tx.setFailureReason(response.getMessage());
         tx.setUpdatedAt(LocalDateTime.now());
 
         repository.save(tx);

@@ -13,14 +13,14 @@ public class TransactionListener {
 
     private final ClearingTransactionService service;
 
-    // Lyssnar på inkommande transaktioner från bankerna
+    // Lyssnar på inkommande transaktioner från banker
     @KafkaListener(topics = "transactions.outgoing", groupId = "clearing-service")
-    public void listenOutgoing(TransactionEvent dto) {
-        service.processIncomingTransaction(dto);
+    public void listenOutgoing(TransactionEvent transactionEvent) {
+        service.processIncomingTransaction(transactionEvent);
     }
 
     // Lyssnar på svar från mottagarbanker
-    @KafkaListener(topics = {"transactions.incoming.BankA", "transactions.incoming.BankB"}, groupId = "clearing-service")
+    @KafkaListener(topics = "transactions.response", groupId = "clearing-service")
     public void listenBankResponses(TransactionResponseEvent response) {
         service.handleBankResponse(response);
     }
