@@ -9,4 +9,5 @@ import java.util.UUID;
 
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
     List<Transaction> findByStatus(TransactionStatus status);
+    List<Transaction> findByFromAccountId(UUID fromAccountId);
 }

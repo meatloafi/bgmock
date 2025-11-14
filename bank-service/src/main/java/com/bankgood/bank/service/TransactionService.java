@@ -1,7 +1,5 @@
 package com.bankgood.bank.service;
 
-import com.bankgood.bank.event.TransactionEvent;
-import com.bankgood.bank.config.BankConfig;
 import com.bankgood.bank.event.TransactionResponseEvent;
 import com.bankgood.bank.model.Account;
 import com.bankgood.bank.model.Transaction;
@@ -10,12 +8,16 @@ import com.bankgood.bank.repository.AccountRepository;
 import com.bankgood.bank.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -23,97 +25,165 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class TransactionService {
 
+    @Value("${BANK_CLEARING_NUMBER}")
+    private String fromClearingNumber;
+
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
-    private final BankConfig bankConfig;
-    private final KafkaTemplate<String, Object> kafkaTemplate;
+
+    private final KafkaTemplate<String, TransactionEvent> transactionKafkaTemplate;
+    private final KafkaTemplate<String, TransactionResponseEvent> responseKafkaTemplate;
 
     private static final String OUTGOING_TOPIC = "transactions.outgoing";
-    /**
-     * Creates a new transaction, withdraws money from the sender's account,
-     * and sends a TransactionEvent to Kafka.
-     */
+    private static final String RESPONSE_TOPIC = "transactions.response";
+
+    // ----------------- Skapa egen transaktion (Bank A → Clearing) -----------------
     @Transactional
     public TransactionEvent createTransaction(TransactionEvent request) {
-        String fromAccountNumber = request.getFromAccountNumber();
-        String toClearingNumber = request.getToBankgoodNumber();
-        // You can add a "toAccountNumber" to the TransactionEvent later
-        String toAccountNumber = request.getFromAccountNumber();
-        BigDecimal amount = request.getAmount();
+        Account fromAccount = accountRepository.findByAccountNumber(request.getFromAccountNumber())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Sender account not found"));
 
-        Account fromAccount = accountRepository.findByAccountNumber(fromAccountNumber)
-                .orElseThrow(() -> new RuntimeException("Sender account not found"));
-
-        if (fromAccount.getBalance().compareTo(amount) < 0) {
-            throw new RuntimeException("Insufficient funds");
+        if (fromAccount.getBalance().compareTo(request.getAmount()) < 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient funds");
         }
 
-        // Withdraw the money
-        fromAccount.setBalance(fromAccount.getBalance().subtract(amount));
-        accountRepository.save(fromAccount);
+        // Debit the sender
+        BigDecimal newBalance = fromAccount.getBalance().subtract(request.getAmount());
+        accountRepository.updateBalance(fromAccount.getAccountId(), newBalance);
+        fromAccount.setBalance(newBalance);
 
-        // Create the transaction entity
+        // Create transaction
         Transaction tx = new Transaction();
-        tx.setTransactionId(UUID.randomUUID());
-        tx.setFromAccountId(fromAccount.getId());
-        tx.setFromAccountNumber(fromAccountNumber);
-        tx.setFromClearingNumber(bankConfig.getClearingNumber()); 
-        tx.setToBankgoodNumber(toClearingNumber);
-        tx.setAmount(amount);
+        tx.setFromAccountId(fromAccount.getAccountId());
+        tx.setFromAccountNumber(request.getFromAccountNumber());
+        tx.setFromClearingNumber(fromClearingNumber);
+        tx.setToBankgoodNumber(request.getToBankgoodNumber());
+        tx.setAmount(request.getAmount());
         tx.setStatus(TransactionStatus.PENDING);
         tx.setCreatedAt(LocalDateTime.now());
         tx.setUpdatedAt(LocalDateTime.now());
+        transactionRepository.save(tx);
+        tx.setTransactionId(tx.getId()); // Use the generated ID as the transactionId
 
-        Transaction savedTx = transactionRepository.save(tx);
-
-        // Build the Kafka event (DTO)
-        TransactionEvent event = new TransactionEvent(
-                savedTx.getTransactionId(),
-                savedTx.getFromAccountId() != null ? savedTx.getFromAccountId().toString() : null,
-                savedTx.getFromClearingNumber(),
-                savedTx.getFromAccountNumber(),
-                savedTx.getToBankgoodNumber(),
-                savedTx.getAmount(),
-                savedTx.getStatus(),
-                savedTx.getCreatedAt(),
-                savedTx.getUpdatedAt()
-        );
-
-        // Send event to Kafka
-        kafkaTemplate.send(OUTGOING_TOPIC, event)
-                .whenComplete((result, ex) -> {
-                    if (ex == null) {
-                        log.info("✅ TransactionEvent sent to Kafka: {}", event);
-                    } else {
-                        log.error("❌ Failed to send TransactionEvent", ex);
-                    }
-                });
+        // Skicka TransactionEvent till clearing-service
+        TransactionEvent event = toEvent(tx);
+        sendTransactionEvent(event);
 
         return event;
     }
 
-    /**
-     * Handles an incoming transaction response (TransactionResponseEvent)
-     * and updates the status in the database.
-     */
+    // ----------------- Hantera inkommande TransactionEvent (Bank B tar emot) -----------------
     @Transactional
-    public void handleTransactionResponse(TransactionResponseEvent response) {
-        Transaction tx = transactionRepository.findById(UUID.fromString(response.getTransactionId()))
-                .orElseThrow(() -> new RuntimeException("Transaction not found"));
+    public void handleIncomingTransaction(TransactionEvent event) {
+        log.info("📥 Hanterar inkommande TransactionEvent: {}", event.getTransactionId());
 
-        if ("FAILED".equalsIgnoreCase(response.getStatus())) {
-            // Compensating rollback
-            Account fromAccount = accountRepository.findByAccountNumber(tx.getFromAccountNumber())
-                    .orElseThrow(() -> new RuntimeException("Sender account not found"));
-            fromAccount.setBalance(fromAccount.getBalance().add(tx.getAmount()));
-            accountRepository.save(fromAccount);
+        Account toAccount = accountRepository.findByAccountNumber(event.getToAccountNumber())
+                .orElse(null);
+
+        TransactionResponseEvent response;
+        if (toAccount == null) {
+            // Konto finns inte → avvisa transaktion
+            response = new TransactionResponseEvent(
+                    event.getTransactionId(),
+                    TransactionStatus.FAILED,
+                    "Receiver account not found"
+            );
+            log.warn("❌ Konto {} saknas, skickar failed response", event.getToAccountNumber());
+        } else {
+            // Konto finns → kreditera mottagare
+            BigDecimal newBalance = toAccount.getBalance().add(event.getAmount());
+            accountRepository.updateBalance(toAccount.getAccountId(), newBalance);
+            toAccount.setBalance(newBalance);
+
+            // Skapa lokalt Transaction för spårning
+            Transaction tx = new Transaction();
+            tx.setTransactionId(event.getTransactionId());
+            tx.setFromAccountId(event.getFromAccountId());
+            tx.setFromAccountNumber(event.getFromAccountNumber());
+            tx.setFromClearingNumber(event.getFromClearingNumber());
+            tx.setToAccountNumber(event.getToAccountNumber());
+            tx.setAmount(event.getAmount());
+            tx.setStatus(TransactionStatus.SUCCESS);
+            tx.setCreatedAt(LocalDateTime.now());
+            tx.setUpdatedAt(LocalDateTime.now());
+            transactionRepository.save(tx);
+
+            response = new TransactionResponseEvent(
+                    event.getTransactionId(),
+                    TransactionStatus.SUCCESS,
+                    "Transaction successful"
+            );
+            log.info("✅ Transaction {} genomförd, skickar success response", event.getTransactionId());
         }
 
-        tx.setStatus("SUCCESS".equalsIgnoreCase(response.getStatus()) ?
-                TransactionStatus.SUCCESS : TransactionStatus.FAILED);
+        // Skicka response till clearing-service
+        sendTransactionResponse(response);
+    }
+
+    // ----------------- Hantera inkommande TransactionResponseEvent (Bank A får svar från clearing) -----------------
+    @Transactional
+    public void handleTransactionResponse(TransactionResponseEvent response) {
+        Transaction tx = transactionRepository.findById(response.getTransactionId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found"));
+
+        if (response.getStatus() == TransactionStatus.FAILED) {
+            // Kompenserande rollback
+            Account fromAccount = accountRepository.findByAccountNumber(tx.getFromAccountNumber())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Sender account not found"));
+
+            BigDecimal refundedBalance = fromAccount.getBalance().add(tx.getAmount());
+            accountRepository.updateBalance(fromAccount.getAccountId(), refundedBalance);
+            fromAccount.setBalance(refundedBalance);
+        }
+
+        tx.setStatus(response.getStatus());
         tx.setUpdatedAt(LocalDateTime.now());
         transactionRepository.save(tx);
 
-        log.info("📩 Transaction {} updated with status: {}", tx.getTransactionId(), tx.getStatus());
+        log.info("📩 Transaction {} uppdaterad med status: {}", tx.getTransactionId(), tx.getStatus());
+    }
+
+    // ----------------- Hjälpmetoder -----------------
+    private void sendTransactionEvent(TransactionEvent event) {
+        transactionKafkaTemplate.send(OUTGOING_TOPIC, event)
+                .whenComplete((result, ex) -> {
+                    if (ex == null) log.info("✅ TransactionEvent skickad: {}", event);
+                    else log.error("❌ Kunde inte skicka TransactionEvent", ex);
+                });
+    }
+
+    private void sendTransactionResponse(TransactionResponseEvent response) {
+        responseKafkaTemplate.send(RESPONSE_TOPIC, response)
+                .whenComplete((result, ex) -> {
+                    if (ex == null) log.info("✅ TransactionResponseEvent skickad: {}", response);
+                    else log.error("❌ Kunde inte skicka TransactionResponseEvent", ex);
+                });
+    }
+
+    private TransactionEvent toEvent(Transaction tx) {
+        return new TransactionEvent(
+                tx.getTransactionId(),
+                tx.getFromAccountId(),
+                tx.getFromClearingNumber(),
+                tx.getFromAccountNumber(),
+                tx.getToAccountNumber(),
+                tx.getAmount(),
+                tx.getStatus(),
+                tx.getCreatedAt(),
+                tx.getUpdatedAt()
+        );
+    }
+
+    // ----------------- Hämta transaktioner -----------------
+    public List<Transaction> getAllTransactions() {
+        return transactionRepository.findAll();
+    }
+
+    public List<Transaction> getTransactionsByStatus(TransactionStatus status) {
+        return transactionRepository.findByStatus(status);
+    }
+
+    public List<Transaction> getTransactionsByAccount(UUID accountId) {
+        return transactionRepository.findByFromAccountId(accountId);
     }
 }

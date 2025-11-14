@@ -14,7 +14,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class TransactionEvent {
     private UUID transactionId;
-    private String fromAccountId;
+    private UUID fromAccountId;
     private String fromClearingNumber;
     private String fromAccountNumber;
     private String toBankgoodNumber;

@@ -1,7 +1,7 @@
 package com.clearingservice.controller;
 
 import com.clearingservice.event.TransactionEvent;
-import com.clearingservice.service.ClearingTransactionService;
+import com.clearingservice.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 public class TransactionController {
 
-    private final ClearingTransactionService service;
+    private final TransactionService service;
 
     // Initierar en betalning
     @PostMapping("/transfer")
