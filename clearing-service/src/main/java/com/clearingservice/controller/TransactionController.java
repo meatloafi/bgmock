@@ -1,6 +1,6 @@
 package com.clearingservice.controller;
 
-import com.clearingservice.event.TransactionEvent;
+import com.bankgood.common.event.TransactionEvent;
 import com.clearingservice.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

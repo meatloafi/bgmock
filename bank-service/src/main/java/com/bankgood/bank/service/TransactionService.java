@@ -1,9 +1,10 @@
 package com.bankgood.bank.service;
 
-import com.bankgood.bank.event.TransactionResponseEvent;
+import com.bankgood.common.event.TransactionEvent;
+import com.bankgood.common.event.TransactionResponseEvent;
 import com.bankgood.bank.model.Account;
 import com.bankgood.bank.model.Transaction;
-import com.bankgood.bank.model.TransactionStatus;
+import com.bankgood.common.model.TransactionStatus;
 import com.bankgood.bank.repository.AccountRepository;
 import com.bankgood.bank.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
@@ -62,8 +63,7 @@ public class TransactionService {
         tx.setStatus(TransactionStatus.PENDING);
         tx.setCreatedAt(LocalDateTime.now());
         tx.setUpdatedAt(LocalDateTime.now());
-        transactionRepository.save(tx);
-        tx.setTransactionId(tx.getId()); // Use the generated ID as the transactionId
+        tx = transactionRepository.save(tx); // Save and get the generated transactionId
 
         // Skicka TransactionEvent till clearing-service
         TransactionEvent event = toEvent(tx);
@@ -166,6 +166,8 @@ public class TransactionService {
                 tx.getFromAccountId(),
                 tx.getFromClearingNumber(),
                 tx.getFromAccountNumber(),
+                tx.getToBankgoodNumber(),
+                tx.getToClearingNumber(), // Added toClearingNumber
                 tx.getToAccountNumber(),
                 tx.getAmount(),
                 tx.getStatus(),

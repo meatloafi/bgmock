@@ -1,4 +1,4 @@
-package com.bankgood.bank.config;
+package com.bankgood.common.config;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.springframework.beans.factory.annotation.Value;

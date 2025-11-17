@@ -1,0 +1,4 @@
+com/bankgood/common/config/KafkaConfig.class
+com/bankgood/common/model/TransactionStatus.class
+com/bankgood/common/event/TransactionEvent.class
+com/bankgood/common/event/TransactionResponseEvent.class

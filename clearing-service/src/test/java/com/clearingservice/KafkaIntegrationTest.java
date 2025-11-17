@@ -1,25 +1,19 @@
 package com.clearingservice;
 
-import com.clearingservice.config.TestKafkaConfig;
-import com.clearingservice.event.TransactionEvent;
-import com.clearingservice.event.TransactionResponseEvent;
-import com.clearingservice.kafka.TransactionEventListener;
-import com.clearingservice.kafka.TransactionResponseListener;
+import com.bankgood.common.config.TestKafkaConfig;
+import com.bankgood.common.event.TransactionEvent;
+import com.bankgood.common.event.TransactionResponseEvent;
+import com.bankgood.common.kafka.TestKafkaConsumer;
 import com.clearingservice.model.BankMapping;
 import com.clearingservice.model.Transaction;
-import com.clearingservice.model.TransactionStatus;
+import com.bankgood.common.model.TransactionStatus;
 import com.clearingservice.repository.BankMappingRepository;
 import com.clearingservice.repository.TransactionRepository;
-import org.apache.kafka.clients.consumer.Consumer;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.common.serialization.StringDeserializer;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
-import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
@@ -28,8 +22,6 @@ import org.springframework.test.context.TestPropertySource;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -67,29 +59,11 @@ public class KafkaIntegrationTest {
     @Autowired
     private BankMappingRepository bankMappingRepository;
 
-    private Consumer<String, Object> testConsumer;
+    private TestKafkaConsumer<Object> testConsumer;
 
     @BeforeEach
     void setUp() {
-        // Create test consumer with KafkaTestUtils
-        Map<String, Object> consumerProps = KafkaTestUtils.consumerProps(
-                "test-group", "true", embeddedKafkaBroker);
-
-        // Configure JSON deserialization
-        JsonDeserializer<Object> jsonDeserializer = new JsonDeserializer<>();
-        jsonDeserializer.addTrustedPackages("*");
-
-        // Create consumer with String key and Object value deserialization
-        testConsumer = new DefaultKafkaConsumerFactory<String, Object>(
-                consumerProps,
-                new StringDeserializer(),
-                jsonDeserializer
-        ).createConsumer();
-
-        // Subscribe to response topic
-        testConsumer.subscribe(Collections.singletonList("transactions.response"));
-
-        // Clear repositories before each test
+        testConsumer = new TestKafkaConsumer<>(embeddedKafkaBroker, "transactions.response", Object.class);
         transactionRepository.deleteAll();
         bankMappingRepository.deleteAll();
     }
@@ -104,16 +78,17 @@ public class KafkaIntegrationTest {
     @Timeout(5)
     void testProducer_sendsTransactionEventCorrectly() throws Exception {
         // Arrange: Subscribe test consumer to a clean topic
-        testConsumer.unsubscribe();
-        testConsumer.subscribe(Collections.singletonList("transactions.incoming.testbank"));
+        testConsumer.getConsumer().unsubscribe();
+        testConsumer.getConsumer().subscribe(java.util.Collections.singletonList("transactions.incoming.testbank"));
 
         TransactionEvent event = new TransactionEvent(
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 "1234",
                 "999888777",
-                "9876",
-                "111222333",
+                "9876", // toBankgoodNumber
+                "9876", // toClearingNumber
+                "111222333", // toAccountNumber
                 BigDecimal.valueOf(75.00),
                 TransactionStatus.PENDING,
                 LocalDateTime.now(),
@@ -129,7 +104,7 @@ public class KafkaIntegrationTest {
                 .pollInterval(100, TimeUnit.MILLISECONDS)
                 .untilAsserted(() -> {
                     org.apache.kafka.clients.consumer.ConsumerRecords<String, Object> records =
-                            KafkaTestUtils.getRecords(testConsumer, Duration.ofMillis(500));
+                            KafkaTestUtils.getRecords(testConsumer.getConsumer(), Duration.ofMillis(500));
                     assertThat(records.count()).isGreaterThan(0);
                 });
 
@@ -153,8 +128,9 @@ public class KafkaIntegrationTest {
                 UUID.randomUUID(),
                 "1234",
                 "999888777",
-                "12345", // toClearingNumber matches mapping
-                null,
+                "12345", // toBankgoodNumber matches mapping
+                "9876", // toClearingNumber
+                "111222333", // toAccountNumber
                 BigDecimal.valueOf(100.00),
                 TransactionStatus.PENDING,
                 LocalDateTime.now(),
@@ -240,7 +216,8 @@ public class KafkaIntegrationTest {
                 "1234",
                 "999888777",
                 "12345", // Will be resolved to clearing 9876, account 111222333
-                null,
+                "9876", // toClearingNumber
+                "111222333", // toAccountNumber
                 BigDecimal.valueOf(200.00),
                 TransactionStatus.PENDING,
                 LocalDateTime.now(),
@@ -287,7 +264,7 @@ public class KafkaIntegrationTest {
 
         // Verify: Response was sent back to Bank A on transactions.response topic
         org.apache.kafka.clients.consumer.ConsumerRecords<String, Object> records =
-                KafkaTestUtils.getRecords(testConsumer, Duration.ofSeconds(2));
+                KafkaTestUtils.getRecords(testConsumer.getConsumer(), Duration.ofSeconds(2));
         assertThat(records.count()).isGreaterThan(0);
 
         System.out.println("✓ End-to-end flow test passed!");
@@ -305,7 +282,8 @@ public class KafkaIntegrationTest {
                 "1234",
                 "999888777",
                 "99999", // Non-existent bankgood number
-                null,
+                null, // toClearingNumber
+                null, // toAccountNumber
                 BigDecimal.valueOf(100.00),
                 TransactionStatus.PENDING,
                 LocalDateTime.now(),
@@ -350,7 +328,8 @@ public class KafkaIntegrationTest {
                 "1234",
                 "999888777",
                 "12345",
-                null,
+                "9876", // toClearingNumber
+                "111222333", // toAccountNumber
                 BigDecimal.valueOf(200.00),
                 TransactionStatus.PENDING,
                 LocalDateTime.now(),

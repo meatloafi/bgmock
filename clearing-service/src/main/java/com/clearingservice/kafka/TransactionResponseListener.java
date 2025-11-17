@@ -1,7 +1,7 @@
 package com.clearingservice.kafka;
 
-import com.clearingservice.event.TransactionResponseEvent;
-import com.clearingservice.model.TransactionStatus;
+import com.bankgood.common.event.TransactionResponseEvent;
+import com.bankgood.common.model.TransactionStatus;
 import com.clearingservice.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

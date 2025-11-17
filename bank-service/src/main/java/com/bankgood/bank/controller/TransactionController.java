@@ -1,9 +1,9 @@
 package com.bankgood.bank.controller;
 
-import com.bankgood.bank.event.TransactionEvent;
-import com.bankgood.bank.event.TransactionResponseEvent;
+import com.bankgood.common.event.TransactionEvent;
+import com.bankgood.common.event.TransactionResponseEvent;
 import com.bankgood.bank.model.Transaction;
-import com.bankgood.bank.model.TransactionStatus;
+import com.bankgood.common.model.TransactionStatus;
 import com.bankgood.bank.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;

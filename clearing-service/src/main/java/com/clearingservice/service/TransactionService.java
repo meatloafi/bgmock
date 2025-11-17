@@ -1,10 +1,10 @@
 package com.clearingservice.service;
 
-import com.clearingservice.event.TransactionEvent;
-import com.clearingservice.event.TransactionResponseEvent;
+import com.bankgood.common.event.TransactionEvent;
+import com.bankgood.common.event.TransactionResponseEvent;
 import com.clearingservice.model.BankMapping;
 import com.clearingservice.model.Transaction;
-import com.clearingservice.model.TransactionStatus;
+import com.bankgood.common.model.TransactionStatus;
 import com.clearingservice.repository.BankMappingRepository;
 import com.clearingservice.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +45,7 @@ public class TransactionService {
         log.info("📥 Mottagen TransactionEvent från Bank A: {}", dto.getTransactionId());
 
         // Lookup mottagare via bankgiro
-        BankMapping mapping = bankMappingRepository.findByBankgoodNumber(dto.getToClearingNumber())
+        BankMapping mapping = bankMappingRepository.findByBankgoodNumber(dto.getToBankgoodNumber())
                 .orElse(null);
 
         // Skapa transaktion i DB
@@ -59,7 +59,7 @@ public class TransactionService {
 
         if (mapping == null) {
             // Mottagare saknas → FAILED
-            log.warn("❌ Mottagare saknas för bankgiro {}", dto.getToClearingNumber());
+            log.warn("❌ Mottagare saknas för bankgiro {}", dto.getToBankgoodNumber());
             tx.setStatus(TransactionStatus.FAILED);
             tx.setFailureReason("Recipient not found");
             transactionRepository.save(tx);
@@ -157,6 +157,7 @@ public class TransactionService {
                 null, // fromAccountId används ej i clearing
                 tx.getFromClearingNumber(),
                 tx.getFromAccountNumber(),
+                null, // toBankgoodNumber is not available in clearing-service's Transaction model
                 tx.getToClearingNumber(),
                 tx.getToAccountNumber(),
                 tx.getAmount(),

@@ -1,7 +1,8 @@
 package com.clearingservice.kafka;
 
-import com.clearingservice.event.TransactionEvent;
-import com.clearingservice.event.TransactionResponseEvent;
+import com.bankgood.common.event.TransactionEvent;
+import com.bankgood.common.event.TransactionResponseEvent;
+import com.bankgood.common.model.TransactionStatus;
 import com.clearingservice.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -35,7 +36,7 @@ public class TransactionEventListener {
             transactionService.sendTransactionResponse(
                     new TransactionResponseEvent(
                             event.getTransactionId(),
-                            com.clearingservice.model.TransactionStatus.FAILED,
+                            TransactionStatus.FAILED,
                             "Internal error in clearing-service"
                     )
             );

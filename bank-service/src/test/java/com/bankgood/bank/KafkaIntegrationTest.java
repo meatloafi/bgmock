@@ -1,6 +1,6 @@
 package com.bankgood.bank;
 
-import org.apache.kafka.clients.consumer.Consumer;
+import com.bankgood.common.kafka.TestKafkaConsumer;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -9,18 +9,14 @@ import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.SpyBean;
-import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.test.EmbeddedKafkaBroker;
 import org.springframework.kafka.test.context.EmbeddedKafka;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 
 import com.bankgood.bank.kafka.PaymentConsumer;
 import com.bankgood.bank.kafka.PaymentProducer;
-import com.bankgood.bank.config.TestKafkaConfig;
-
-import java.util.Map;
+import com.bankgood.common.config.TestKafkaConfig;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.timeout;
@@ -56,17 +52,11 @@ public class KafkaIntegrationTest {
     @Autowired
     private EmbeddedKafkaBroker embeddedKafkaBroker;
 
-    private Consumer<String, Object> testConsumer;
+    private TestKafkaConsumer<Object> testConsumer;
 
     @BeforeEach
     void setUp() {
-        Map<String, Object> consumerProps = KafkaTestUtils.consumerProps("test-group", "true", embeddedKafkaBroker);
-        
-        JsonDeserializer<Object> jsonDeserializer = new JsonDeserializer<>();
-        jsonDeserializer.addTrustedPackages("*");
-
-        testConsumer = new DefaultKafkaConsumerFactory<String, Object>(consumerProps, new org.apache.kafka.common.serialization.StringDeserializer(), jsonDeserializer).createConsumer();
-        testConsumer.subscribe(java.util.Collections.singletonList("payment.requests"));
+        testConsumer = new TestKafkaConsumer<>(embeddedKafkaBroker, "payment.requests", Object.class);
     }
 
     @AfterEach
@@ -82,7 +72,7 @@ public class KafkaIntegrationTest {
 
         paymentProducer.sendMessage(message);
 
-        ConsumerRecord<String, Object> singleRecord = KafkaTestUtils.getSingleRecord(testConsumer, "payment.requests");
+        ConsumerRecord<String, Object> singleRecord = KafkaTestUtils.getSingleRecord(testConsumer.getConsumer(), "payment.requests");
         assertThat(singleRecord).isNotNull();
         assertThat(singleRecord.value()).isEqualTo(message);
     }

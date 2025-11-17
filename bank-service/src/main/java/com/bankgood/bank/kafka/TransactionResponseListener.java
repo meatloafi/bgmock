@@ -1,6 +1,6 @@
 package com.bankgood.bank.kafka;
 
-import com.bankgood.bank.event.TransactionResponseEvent;
+import com.bankgood.common.event.TransactionResponseEvent;
 import com.bankgood.bank.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
