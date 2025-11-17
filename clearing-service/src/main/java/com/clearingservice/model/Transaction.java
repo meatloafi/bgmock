@@ -1,14 +1,13 @@
-package com.bankgood.bank.model;
+package com.clearingservice.model;
+
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
-
-import org.hibernate.annotations.CreationTimestamp;
-import org.hibernate.annotations.UpdateTimestamp;
-
-import jakarta.persistence.*;
-import lombok.*;
 
 @Entity
 @Table(name = "transactions")
@@ -19,34 +18,35 @@ public class Transaction {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(unique = true, updatable = false, nullable = false)
-    private UUID transactionId;
+    private UUID id;
 
-
-    @Column(nullable = false)
-    private UUID fromAccountId;
-
-    @Column(nullable = false)
-    private String fromClearingNumber;
+    @Column(nullable = false, unique = true)
+    private UUID transactionId; // samma som i TransactionDTO
 
     @Column(nullable = false)
     private String fromAccountNumber;
 
     @Column(nullable = false)
-    private String toBankgoodNumber;
+    private String fromClearingNumber;
 
     @Column(nullable = false)
+    private String toClearingNumber;
+
+    @Column(nullable = false)
+    private String toAccountNumber;
+
+    @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private TransactionStatus status;
+    private TransactionStatus status; // PENDING, SUCCESS, FAILED
+
+    private String failureReason;
 
     @CreationTimestamp
-    @Column(nullable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
-    @Column(nullable = false)
     private LocalDateTime updatedAt;
 }

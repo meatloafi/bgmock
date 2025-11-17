@@ -1,6 +1,6 @@
-package com.bankgood.bank.event;
+package com.clearingservice.event;
 
-import com.bankgood.bank.model.TransactionStatus;
+import com.clearingservice.model.TransactionStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,7 +17,8 @@ public class TransactionEvent {
     private UUID fromAccountId;
     private String fromClearingNumber;
     private String fromAccountNumber;
-    private String toBankgoodNumber;
+    private String toClearingNumber; // Fylls via lookup
+    private String toAccountNumber; // Fylls via lookup
     private BigDecimal amount;
     private TransactionStatus status;
     private LocalDateTime createdAt;
