@@ -1,10 +1,10 @@
 package com.clearingservice.service;
 
-import com.clearingservice.event.TransactionEvent;
-import com.clearingservice.event.TransactionResponseEvent;
+import com.bankgood.common.event.TransactionEvent;
+import com.bankgood.common.event.TransactionResponseEvent;
 import com.clearingservice.model.BankMapping;
 import com.clearingservice.model.Transaction;
-import com.clearingservice.model.TransactionStatus;
+import com.bankgood.common.model.TransactionStatus;
 import com.clearingservice.repository.BankMappingRepository;
 import com.clearingservice.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
@@ -16,13 +16,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 /**
- * Service som hanterar hela clearing-logiken:
- * 1. Tar emot TransactionEvent från Bank A
- * 2. Lookup bankgiro → clearing + konto
- * 3. Sparar transaktionen som PENDING eller FAILED
- * 4. Forwardar till Bank B
- * 5. Tar emot TransactionResponseEvent från Bank B
- * 6. Uppdaterar transaktionen och skickar tillbaka status till Bank A
+ * Service that handles the complete clearing logic:
+ * 1. Receives TransactionEvent from Bank A
+ * 2. Looks up bankgood number → clearing number + account number
+ * 3. Saves the transaction as PENDING or FAILED
+ * 4. Forwards to Bank B
+ * 5. Receives TransactionResponseEvent from Bank B
+ * 6. Updates the transaction and sends status back to Bank A
  */
 @Service
 @RequiredArgsConstructor
@@ -38,17 +38,17 @@ public class TransactionService {
     private static final String RESPONSE_TOPIC = "transactions.response";
 
     /**
-     * Hanterar inkommande TransactionEvent från Bank A
+     * Handles incoming TransactionEvent from Bank A
      */
     @Transactional
     public void processIncomingTransaction(TransactionEvent dto) {
-        log.info("📥 Mottagen TransactionEvent från Bank A: {}", dto.getTransactionId());
+        log.info("📥 Received TransactionEvent from Bank A: {}", dto.getTransactionId());
 
-        // Lookup mottagare via bankgiro
-        BankMapping mapping = bankMappingRepository.findByBankgoodNumber(dto.getToClearingNumber())
+        // Look up recipient via bankgood number
+        BankMapping mapping = bankMappingRepository.findByBankgoodNumber(dto.getToBankgoodNumber())
                 .orElse(null);
 
-        // Skapa transaktion i DB
+        // Create transaction in DB
         Transaction tx = new Transaction();
         tx.setTransactionId(dto.getTransactionId());
         tx.setFromAccountNumber(dto.getFromAccountNumber());
@@ -58,13 +58,13 @@ public class TransactionService {
         tx.setUpdatedAt(LocalDateTime.now());
 
         if (mapping == null) {
-            // Mottagare saknas → FAILED
-            log.warn("❌ Mottagare saknas för bankgiro {}", dto.getToClearingNumber());
+            // Recipient not found → FAILED
+            log.warn("❌ Recipient not found for bankgood number {}", dto.getToBankgoodNumber());
             tx.setStatus(TransactionStatus.FAILED);
             tx.setFailureReason("Recipient not found");
             transactionRepository.save(tx);
 
-            // Skicka direkt fail-response till Bank A
+            // Send immediate failure response to Bank A
             TransactionResponseEvent response = new TransactionResponseEvent(
                     dto.getTransactionId(),
                     TransactionStatus.FAILED,
@@ -74,19 +74,19 @@ public class TransactionService {
             return;
         }
 
-        // Mottagare finns → fyll i clearing + kontonummer
+        // Recipient found → populate clearing number + account number
         tx.setToClearingNumber(mapping.getClearingNumber());
         tx.setToAccountNumber(mapping.getAccountNumber());
         tx.setStatus(TransactionStatus.PENDING);
         transactionRepository.save(tx);
 
-        // Forward till Bank B
+        // Forward to Bank B
         TransactionEvent forwardEvent = toEvent(tx);
         forwardTransactionToBank(forwardEvent, mapping.getBankName());
     }
 
     /**
-     * Forwardar TransactionEvent till mottagarbank (Bank B)
+     * Forwards TransactionEvent to recipient bank (Bank B)
      */
     public void forwardTransactionToBank(TransactionEvent event, String bankName) {
         String bankTopic = "transactions.incoming." + bankName;
@@ -94,18 +94,18 @@ public class TransactionService {
         transactionKafkaTemplate.send(bankTopic, event)
                 .whenComplete((result, ex) -> {
                     if (ex == null) {
-                        log.info("✅ TransactionEvent {} skickad till Bank B-topic {}", event.getTransactionId(), bankTopic);
+                        log.info("✅ TransactionEvent {} sent to Bank B topic: {}", event.getTransactionId(), bankTopic);
                     } else {
-                        log.error("❌ Kunde inte skicka TransactionEvent {} till Bank B-topic {}", event.getTransactionId(), bankTopic, ex);
+                        log.error("❌ Failed to send TransactionEvent {} to Bank B topic: {}", event.getTransactionId(), bankTopic, ex);
 
-                        // Markera transaktionen som FAILED
+                        // Mark transaction as FAILED
                         transactionRepository.findByTransactionId(event.getTransactionId()).ifPresent(tx -> {
                             tx.setStatus(TransactionStatus.FAILED);
                             tx.setFailureReason("Failed to forward transaction");
                             tx.setUpdatedAt(LocalDateTime.now());
                             transactionRepository.save(tx);
 
-                            // Skicka fail-response till Bank A
+                            // Send failure response to Bank A
                             TransactionResponseEvent failResponse = new TransactionResponseEvent(
                                     tx.getTransactionId(),
                                     TransactionStatus.FAILED,
@@ -118,45 +118,46 @@ public class TransactionService {
     }
 
     /**
-     * Hanterar svar från Bank B (SUCCESS / FAILED)
+     * Handles response from Bank B (SUCCESS / FAILED)
      */
     @Transactional
     public void handleBankResponse(TransactionResponseEvent response) {
         Transaction tx = transactionRepository.findByTransactionId(response.getTransactionId())
                 .orElseThrow(() -> new RuntimeException("Transaction not found: " + response.getTransactionId()));
 
-        // Uppdatera status i DB
+        // Update status in DB
         tx.setStatus(response.getStatus());
         tx.setFailureReason(response.getMessage());
         tx.setUpdatedAt(LocalDateTime.now());
         transactionRepository.save(tx);
 
-        log.info("📩 Transaction {} uppdaterad med status {}", tx.getTransactionId(), tx.getStatus());
+        log.info("📩 Transaction {} updated with status: {}", tx.getTransactionId(), tx.getStatus());
 
-        // Skicka tillbaka status till Bank A
+        // Send status back to Bank A
         sendTransactionResponse(response);
     }
 
     /**
-     * Skickar TransactionResponseEvent till Bank A
+     * Sends TransactionResponseEvent to Bank A
      */
     public void sendTransactionResponse(TransactionResponseEvent response) {
         responseKafkaTemplate.send(RESPONSE_TOPIC, response)
                 .whenComplete((result, ex) -> {
-                    if (ex == null) log.info("✅ TransactionResponseEvent skickad till Bank A: {}", response);
-                    else log.error("❌ Kunde inte skicka TransactionResponseEvent {}", response, ex);
+                    if (ex == null) log.info("✅ TransactionResponseEvent sent to Bank A: {}", response);
+                    else log.error("❌ Failed to send TransactionResponseEvent: {}", response, ex);
                 });
     }
 
     /**
-     * Konverterar Transaction → TransactionEvent för forwarding
+     * Converts Transaction → TransactionEvent for forwarding
      */
     private TransactionEvent toEvent(Transaction tx) {
         return new TransactionEvent(
                 tx.getTransactionId(),
-                null, // fromAccountId används ej i clearing
+                null, // fromAccountId not used in clearing
                 tx.getFromClearingNumber(),
                 tx.getFromAccountNumber(),
+                null, // toBankgoodNumber is not available in clearing-service's Transaction model
                 tx.getToClearingNumber(),
                 tx.getToAccountNumber(),
                 tx.getAmount(),

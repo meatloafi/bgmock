@@ -47,7 +47,7 @@ public class AccountController {
         return ResponseEntity.noContent().build();
     }
 
-    // Endpoint för att justera saldo (positivt eller negativt)
+    // Endpoint to adjust balance (positive or negative)
     @PostMapping("/{id}/adjust")
     public ResponseEntity<Account> adjustBalance(@PathVariable UUID id, @RequestParam BigDecimal amount) {
         accountService.adjustBalance(id, amount);
