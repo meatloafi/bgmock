@@ -29,10 +29,10 @@ public class Transaction {
     @Column(nullable = false)
     private String fromClearingNumber;
 
-    @Column(nullable = false)
+    @Column(nullable = true)  // Can be null when recipient mapping not found
     private String toClearingNumber;
 
-    @Column(nullable = false)
+    @Column(nullable = true)  // Can be null when recipient mapping not found
     private String toAccountNumber;
 
     @Column(nullable = false, precision = 15, scale = 2)
