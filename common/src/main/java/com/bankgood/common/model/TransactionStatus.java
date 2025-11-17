@@ -1,4 +1,4 @@
-package com.bankgood.bank.model;
+package com.bankgood.common.model;
 
 public enum TransactionStatus {
     PENDING,

@@ -1,7 +1,7 @@
 package com.bankgood.bank.repository;
 
 import com.bankgood.bank.model.Transaction;
-import com.bankgood.bank.model.TransactionStatus;
+import com.bankgood.common.model.TransactionStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

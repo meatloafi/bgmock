@@ -1,5 +1,6 @@
 package com.bankgood.bank.model;
 
+import com.bankgood.common.model.TransactionStatus;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -34,6 +35,12 @@ public class Transaction {
 
     @Column(nullable = false)
     private String toBankgoodNumber;
+
+    @Column(nullable = true)
+    private String toClearingNumber;
+
+    @Column(nullable = true)
+    private String toAccountNumber;
 
     @Column(nullable = false)
     private BigDecimal amount;

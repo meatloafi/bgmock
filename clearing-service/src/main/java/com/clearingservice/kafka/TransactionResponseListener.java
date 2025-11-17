@@ -1,7 +1,7 @@
 package com.clearingservice.kafka;
 
-import com.clearingservice.event.TransactionResponseEvent;
-import com.clearingservice.model.TransactionStatus;
+import com.bankgood.common.event.TransactionResponseEvent;
+import com.bankgood.common.model.TransactionStatus;
 import com.clearingservice.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,8 +9,8 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Kafka-listener som tar emot TransactionResponseEvent från Bank B
- * och skickar tillbaka till Bank A.
+ * Kafka listener that receives TransactionResponseEvent from Bank B
+ * and sends it back to Bank A.
  */
 @Slf4j
 @Component
@@ -20,21 +20,21 @@ public class TransactionResponseListener {
     private final TransactionService transactionService;
 
     @KafkaListener(
-            topics = "transactions.response", // Response från Bank B
+            topics = "transactions.response", // Response from Bank B
             groupId = "clearing-service",
             containerFactory = "responseListenerFactory"
     )
     public void listenTransactionResponse(TransactionResponseEvent response) {
-        log.info("📥 Mottog TransactionResponseEvent från Bank B: {}", response.getTransactionId());
+        log.info("📥 Received TransactionResponseEvent from Bank B: {}", response.getTransactionId());
 
         try {
             transactionService.handleBankResponse(response);
-            log.info("✅ TransactionResponseEvent {} skickad tillbaka till Bank A med status {}",
+            log.info("✅ TransactionResponseEvent {} sent back to Bank A with status: {}",
                     response.getTransactionId(), response.getStatus());
         } catch (Exception e) {
-            log.error("❌ Fel vid hantering av TransactionResponseEvent {}: {}", response.getTransactionId(), e.getMessage(), e);
+            log.error("❌ Error handling TransactionResponseEvent {}: {}", response.getTransactionId(), e.getMessage(), e);
 
-            // Skicka fail-response om DB-uppdatering misslyckas
+            // Send failure response if DB update fails
             transactionService.sendTransactionResponse(
                     new TransactionResponseEvent(
                             response.getTransactionId(),

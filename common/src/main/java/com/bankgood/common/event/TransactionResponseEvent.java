@@ -1,6 +1,6 @@
-package com.bankgood.bank.event;
+package com.bankgood.common.event;
 
-import com.bankgood.bank.model.TransactionStatus;
+import com.bankgood.common.model.TransactionStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
