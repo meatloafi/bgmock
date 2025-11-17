@@ -10,7 +10,7 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 /**
- * Kafka-listener som tar emot TransactionEvent från Bank A
+ * Kafka listener that receives TransactionEvent from Bank A
  */
 @Slf4j
 @Component
@@ -20,19 +20,19 @@ public class TransactionEventListener {
     private final TransactionService transactionService;
 
     @KafkaListener(
-            topics = "transactions.outgoing", // Event från Bank A
+            topics = "transactions.outgoing", // Event from Bank A
             groupId = "clearing-service",
             containerFactory = "transactionListenerFactory"
     )
     public void listenTransactionEvent(TransactionEvent event) {
-        log.info("📥 Mottog TransactionEvent från Bank A: {}", event.getTransactionId());
+        log.info("📥 Received TransactionEvent from Bank A: {}", event.getTransactionId());
 
         try {
             transactionService.processIncomingTransaction(event);
         } catch (Exception e) {
-            log.error("❌ Fel vid hantering av TransactionEvent {}: {}", event.getTransactionId(), e.getMessage(), e);
+            log.error("❌ Error handling TransactionEvent {}: {}", event.getTransactionId(), e.getMessage(), e);
 
-            // Skicka fail-response om något går fel
+            // Send failure response if something goes wrong
             transactionService.sendTransactionResponse(
                     new TransactionResponseEvent(
                             event.getTransactionId(),

@@ -38,7 +38,7 @@ public class TransactionService {
     private static final String OUTGOING_TOPIC = "transactions.outgoing";
     private static final String RESPONSE_TOPIC = "transactions.response";
 
-    // ----------------- Skapa egen transaktion (Bank A → Clearing) -----------------
+    // ----------------- Create outgoing transaction (Bank A → Clearing) -----------------
     @Transactional
     public TransactionEvent createTransaction(TransactionEvent request) {
         Account fromAccount = accountRepository.findByAccountNumber(request.getFromAccountNumber())
@@ -65,37 +65,37 @@ public class TransactionService {
         tx.setUpdatedAt(LocalDateTime.now());
         tx = transactionRepository.save(tx); // Save and get the generated transactionId
 
-        // Skicka TransactionEvent till clearing-service
+        // Send TransactionEvent to clearing-service
         TransactionEvent event = toEvent(tx);
         sendTransactionEvent(event);
 
         return event;
     }
 
-    // ----------------- Hantera inkommande TransactionEvent (Bank B tar emot) -----------------
+    // ----------------- Handle incoming TransactionEvent (Bank B receives) -----------------
     @Transactional
     public void handleIncomingTransaction(TransactionEvent event) {
-        log.info("📥 Hanterar inkommande TransactionEvent: {}", event.getTransactionId());
+        log.info("📥 Handling incoming TransactionEvent: {}", event.getTransactionId());
 
         Account toAccount = accountRepository.findByAccountNumber(event.getToAccountNumber())
                 .orElse(null);
 
         TransactionResponseEvent response;
         if (toAccount == null) {
-            // Konto finns inte → avvisa transaktion
+            // Account not found → reject transaction
             response = new TransactionResponseEvent(
                     event.getTransactionId(),
                     TransactionStatus.FAILED,
                     "Receiver account not found"
             );
-            log.warn("❌ Konto {} saknas, skickar failed response", event.getToAccountNumber());
+            log.warn("❌ Account {} not found, sending failed response", event.getToAccountNumber());
         } else {
-            // Konto finns → kreditera mottagare
+            // Account found → credit recipient
             BigDecimal newBalance = toAccount.getBalance().add(event.getAmount());
             accountRepository.updateBalance(toAccount.getAccountId(), newBalance);
             toAccount.setBalance(newBalance);
 
-            // Skapa lokalt Transaction för spårning
+            // Create local Transaction for tracking
             Transaction tx = new Transaction();
             tx.setTransactionId(event.getTransactionId());
             tx.setFromAccountId(event.getFromAccountId());
@@ -113,21 +113,21 @@ public class TransactionService {
                     TransactionStatus.SUCCESS,
                     "Transaction successful"
             );
-            log.info("✅ Transaction {} genomförd, skickar success response", event.getTransactionId());
+            log.info("✅ Transaction {} completed, sending success response", event.getTransactionId());
         }
 
-        // Skicka response till clearing-service
+        // Send response to clearing-service
         sendTransactionResponse(response);
     }
 
-    // ----------------- Hantera inkommande TransactionResponseEvent (Bank A får svar från clearing) -----------------
+    // ----------------- Handle incoming TransactionResponseEvent (Bank A receives response from clearing) -----------------
     @Transactional
     public void handleTransactionResponse(TransactionResponseEvent response) {
         Transaction tx = transactionRepository.findById(response.getTransactionId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Transaction not found"));
 
         if (response.getStatus() == TransactionStatus.FAILED) {
-            // Kompenserande rollback
+            // Compensating rollback
             Account fromAccount = accountRepository.findByAccountNumber(tx.getFromAccountNumber())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Sender account not found"));
 
@@ -140,23 +140,23 @@ public class TransactionService {
         tx.setUpdatedAt(LocalDateTime.now());
         transactionRepository.save(tx);
 
-        log.info("📩 Transaction {} uppdaterad med status: {}", tx.getTransactionId(), tx.getStatus());
+        log.info("📩 Transaction {} updated with status: {}", tx.getTransactionId(), tx.getStatus());
     }
 
-    // ----------------- Hjälpmetoder -----------------
+    // ----------------- Helper methods -----------------
     private void sendTransactionEvent(TransactionEvent event) {
         transactionKafkaTemplate.send(OUTGOING_TOPIC, event)
                 .whenComplete((result, ex) -> {
-                    if (ex == null) log.info("✅ TransactionEvent skickad: {}", event);
-                    else log.error("❌ Kunde inte skicka TransactionEvent", ex);
+                    if (ex == null) log.info("✅ TransactionEvent sent: {}", event);
+                    else log.error("❌ Failed to send TransactionEvent", ex);
                 });
     }
 
     private void sendTransactionResponse(TransactionResponseEvent response) {
         responseKafkaTemplate.send(RESPONSE_TOPIC, response)
                 .whenComplete((result, ex) -> {
-                    if (ex == null) log.info("✅ TransactionResponseEvent skickad: {}", response);
-                    else log.error("❌ Kunde inte skicka TransactionResponseEvent", ex);
+                    if (ex == null) log.info("✅ TransactionResponseEvent sent: {}", response);
+                    else log.error("❌ Failed to send TransactionResponseEvent", ex);
                 });
     }
 
@@ -176,7 +176,7 @@ public class TransactionService {
         );
     }
 
-    // ----------------- Hämta transaktioner -----------------
+    // ----------------- Get transactions -----------------
     public List<Transaction> getAllTransactions() {
         return transactionRepository.findAll();
     }

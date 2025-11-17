@@ -17,19 +17,19 @@ public class TransactionEventListener {
     private final TransactionService transactionService;
 
     @KafkaListener(
-            topics = "transactions.outgoing", // Event från clearing-service
+            topics = "transactions.outgoing", // Event from clearing-service
             groupId = "bank-service",
             containerFactory = "transactionListenerFactory"
     )
     public void listenTransactionEvent(TransactionEvent event) {
-        log.info("📥 Mottog TransactionEvent från clearing-service: {}", event.getTransactionId());
+        log.info("📥 Received TransactionEvent from clearing-service: {}", event.getTransactionId());
 
         try {
-            // Bank B hanterar inkommande transaktion
+            // Bank B handles incoming transaction
             transactionService.handleIncomingTransaction(event);
-            log.info("✅ TransactionEvent {} behandlad och svar skickat", event.getTransactionId());
+            log.info("✅ TransactionEvent {} processed and response sent", event.getTransactionId());
         } catch (Exception e) {
-            log.error("❌ Fel vid hantering av TransactionEvent {}: {}", event.getTransactionId(), e.getMessage(), e);
+            log.error("❌ Error handling TransactionEvent {}: {}", event.getTransactionId(), e.getMessage(), e);
         }
     }
 }
