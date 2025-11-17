@@ -20,7 +20,7 @@ public class Transaction {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true) // TODO, kolla om det räcker med endast en id.
     private UUID transactionId; // samma som i TransactionDTO
 
     @Column(nullable = false)
@@ -41,8 +41,6 @@ public class Transaction {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private TransactionStatus status; // PENDING, SUCCESS, FAILED
-
-    private String failureReason;
 
     @CreationTimestamp
     private LocalDateTime createdAt;

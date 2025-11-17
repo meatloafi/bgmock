@@ -27,10 +27,10 @@ public class Transaction {
     private UUID fromAccountId;
 
     @Column(nullable = false)
-    private String fromClearingNumber;
+    private String fromClearingNumber; // TODO, kolla om det behövs eftersom vi redan har fromAccountId
 
     @Column(nullable = false)
-    private String fromAccountNumber;
+    private String fromAccountNumber; // TODO, kolla om det behövs eftersom vi redan har fromAccountId
 
     @Column(nullable = false)
     private String toBankgoodNumber;
@@ -40,7 +40,7 @@ public class Transaction {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private TransactionStatus status;
+    private TransactionStatus status; // PENDING, SUCCESS, FAILED
 
     @CreationTimestamp
     @Column(nullable = false)
