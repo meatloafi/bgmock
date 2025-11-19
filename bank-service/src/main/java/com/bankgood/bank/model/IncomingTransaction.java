@@ -11,42 +11,41 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "transactions")
+@Table(name = "incoming_transactions")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Transaction {
+public class IncomingTransaction {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(unique = true, updatable = false, nullable = false)
     private UUID transactionId;
 
+    @Column(nullable = false)
+    private String toClearingNumber;
 
     @Column(nullable = false)
-    private UUID fromAccountId;
-
-    @Column(nullable = false)
-    private String fromClearingNumber; // TODO, kolla om det behövs eftersom vi redan har fromAccountId
-
-    @Column(nullable = false)
-    private String fromAccountNumber; // TODO, kolla om det behövs eftersom vi redan har fromAccountId
-
-    @Column(nullable = false)
-    private String toBankgoodNumber;
+    private String toAccountNumber;
 
     @Column(nullable = false)
     private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private TransactionStatus status; // PENDING, SUCCESS, FAILED
+    private TransactionStatus status = TransactionStatus.PENDING; // PENDING, SUCCESS, FAILED
 
     @CreationTimestamp
     @Column(nullable = false)
-    private LocalDateTime createdAt;
+    private final LocalDateTime createdAt = LocalDateTime.now();
 
     @UpdateTimestamp
     @Column(nullable = false)
-    private LocalDateTime updatedAt;
+    private LocalDateTime updatedAt = this.createdAt;
+
+    public IncomingTransaction(String toClearingNumber, String toAccountNumber, BigDecimal amount) {
+        this.toClearingNumber = toClearingNumber;
+        this.toAccountNumber = toAccountNumber;
+        this.amount = amount;
+    }
 }

@@ -12,7 +12,7 @@ import java.util.UUID;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class TransactionEvent {
+public class OutgoingTransactionEvent {
     private UUID transactionId;
     private UUID fromAccountId;
     private String fromClearingNumber;
