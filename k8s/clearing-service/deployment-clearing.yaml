@@ -25,24 +25,57 @@ spec:
           ports:
             - containerPort: 8080
               name: http
+          env: 
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres-service-clearing:5432/clearing_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config-clearing
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret-clearing
+                  key: POSTGRES_PASSWORD
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "update"
+            - name: SPRING_APPLICATION_NAME
+              value: "clearing-service"
+
+            # Kafka config
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "bgmock-kafka-kafka-plain-bootstrap.kafka.svc.cluster.local:9092"
+            - name: SPRING_KAFKA_CONSUMER_GROUP_ID
+              value: "clearing-service-group"
+            - name: SPRING_KAFKA_PRODUCER_KEY_SERIALIZER
+              value: "org.apache.kafka.common.serialization.StringSerializer"
+            - name: SPRING_KAFKA_PRODUCER_VALUE_SERIALIZER
+              value: "org.apache.kafka.common.serialization.StringSerializer"
+            - name: SPRING_KAFKA_CONSUMER_KEY_DESERIALIZER
+              value: "org.apache.kafka.common.serialization.StringDeserializer"
+            - name: SPRING_KAFKA_CONSUMER_VALUE_DESERIALIZER
+              value: "org.apache.kafka.common.serialization.StringDeserializer"
 
 
           livenessProbe:
             httpGet:
               path: /health
               port: 8080
-            initialDelaySeconds: 30
-            periodSeconds: 10
-            timeoutSeconds: 5
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
             failureThreshold: 3
+
           readinessProbe:
             httpGet:
               path: /health
               port: 8080
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            timeoutSeconds: 3
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            timeoutSeconds: 10
             failureThreshold: 3
+          
           resources:
             requests:
               memory: "512Mi"
