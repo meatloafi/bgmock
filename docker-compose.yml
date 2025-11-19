@@ -1,0 +1,234 @@
+version: '3.8'
+
+services:
+  # PostgreSQL for Bank A
+  postgres-bank-a:
+    image: postgres:15-alpine
+    container_name: postgres-bank-a
+    environment:
+      POSTGRES_USER: bank_a_user
+      POSTGRES_PASSWORD: bank_a_password
+      POSTGRES_DB: bank_a_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-bank-a-data:/var/lib/postgresql/data
+    networks:
+      - bgmock-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bank_a_user -d bank_a_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL for Bank B
+  postgres-bank-b:
+    image: postgres:15-alpine
+    container_name: postgres-bank-b
+    environment:
+      POSTGRES_USER: bank_b_user
+      POSTGRES_PASSWORD: bank_b_password
+      POSTGRES_DB: bank_b_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-bank-b-data:/var/lib/postgresql/data
+    networks:
+      - bgmock-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bank_b_user -d bank_b_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # PostgreSQL for Clearing Service
+  postgres-clearing:
+    image: postgres:15-alpine
+    container_name: postgres-clearing
+    environment:
+      POSTGRES_USER: clearing_user
+      POSTGRES_PASSWORD: clearing_password
+      POSTGRES_DB: clearing_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres-clearing-data:/var/lib/postgresql/data
+    networks:
+      - bgmock-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clearing_user -d clearing_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Apache Zookeeper (required for Kafka)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: bgmock-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - bgmock-network
+
+  # Apache Kafka
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: bgmock-kafka
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    ports:
+      - "29092:29092"
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    networks:
+      - bgmock-network
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+
+  # Bank A Service
+  bank-a:
+    build:
+      context: ./bank-service
+      dockerfile: Dockerfile
+    container_name: bgmock-bank-a
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-bank-a:5432/bank_a_db
+      SPRING_DATASOURCE_USERNAME: bank_a_user
+      SPRING_DATASOURCE_PASSWORD: bank_a_password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "false"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      BANK_CLEARING_NUMBER: "000001"
+      BANK_NAME: "Bank A"
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres-bank-a:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - bgmock-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # Bank B Service
+  bank-b:
+    build:
+      context: ./bank-service
+      dockerfile: Dockerfile
+    container_name: bgmock-bank-b
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-bank-b:5432/bank_b_db
+      SPRING_DATASOURCE_USERNAME: bank_b_user
+      SPRING_DATASOURCE_PASSWORD: bank_b_password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "false"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      BANK_CLEARING_NUMBER: "000002"
+      BANK_NAME: "Bank B"
+    ports:
+      - "8082:8080"
+    depends_on:
+      postgres-bank-b:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - bgmock-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # Clearing Service
+  clearing:
+    build:
+      context: ./clearing-service
+      dockerfile: Dockerfile
+    container_name: bgmock-clearing
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-clearing:5432/clearing_db
+      SPRING_DATASOURCE_USERNAME: clearing_user
+      SPRING_DATASOURCE_PASSWORD: clearing_password
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_JPA_SHOW_SQL: "false"
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    ports:
+      - "8083:8080"
+    depends_on:
+      postgres-clearing:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+    networks:
+      - bgmock-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  # BGMock Simulator - Python Streamlit UI
+  simulator:
+    build:
+      context: ./bgmock-simulator
+      dockerfile: Dockerfile
+    container_name: bgmock-simulator
+    ports:
+      - "8501:8501"
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      BANK_A_URL: http://bank-a:8080
+      BANK_B_URL: http://bank-b:8080
+      CLEARING_SERVICE_URL: http://clearing:8080
+    depends_on:
+      - kafka
+      - bank-a
+      - bank-b
+      - clearing
+    networks:
+      - bgmock-network
+    command: streamlit run src/ui/streamlit_app.py --server.headless=true --server.address=0.0.0.0
+
+  # Kafka UI - Optional visualization tool
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: bgmock-kafka-ui
+    ports:
+      - "8080:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: bgmock
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    depends_on:
+      - kafka
+      - zookeeper
+    networks:
+      - bgmock-network
+
+networks:
+  bgmock-network:
+    driver: bridge
+
+volumes:
+  postgres-bank-a-data:
+  postgres-bank-b-data:
+  postgres-clearing-data:

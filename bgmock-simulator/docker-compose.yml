@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  simulator:
+    build: .
+    container_name: bgmock-simulator
+    ports:
+      - "8501:8501"  # Streamlit
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - BANK_A_URL=http://bank-a:8080
+      - BANK_B_URL=http://bank-b:8080
+      - CLEARING_SERVICE_URL=http://clearing:8080
+      - DB_BANK_A=postgresql://bank_a_user:password@postgres-bank-a:5432/bank_a_db
+      - DB_BANK_B=postgresql://bank_b_user:password@postgres-bank-b:5432/bank_b_db
+      - DB_SWITCH=postgresql://switch_user:password@postgres-switch:5432/switch_db
+    networks:
+      - bgmock-network
+    # The 'depends_on' might need to be adjusted based on your main docker-compose file
+    # to ensure the simulator starts after the kafka and bank services are ready.
+    # For now, this is a placeholder.
+    # depends_on:
+    #   - kafka 
+    command: streamlit run src/ui/streamlit_app.py
+
+networks:
+  bgmock-network:
+    external: true
