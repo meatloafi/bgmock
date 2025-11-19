@@ -1,11 +1,12 @@
 package com.bankgood.bank.config;
 
-import com.bankgood.bank.event.TransactionEvent;
+import com.bankgood.bank.event.OutgoingTransactionEvent;
 import com.bankgood.bank.event.TransactionResponseEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
@@ -17,15 +18,16 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 import java.util.HashMap;
 import java.util.Map;
 
-@Configuration
 @EnableKafka
+@Configuration
 public class KafkaConfig {
 
-    private final String bootstrapServers = "clearing-service:9092"; // TODO Ange rätt Kafka-broker host som deployas på clearing-service
+    @Value("${spring.kafka.bootstrap-servers}")
+    private String bootstrapServers;
 
-    // ---------------- Producer TransactionEvent ----------------
-    @Bean
-    public ProducerFactory<String, TransactionEvent> transactionProducerFactory() {
+    // ===================== PRODUCER =====================
+
+    private <T> ProducerFactory<String, T> producerFactory() {
         Map<String, Object> config = new HashMap<>();
         config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
@@ -34,50 +36,40 @@ public class KafkaConfig {
     }
 
     @Bean
-    public KafkaTemplate<String, TransactionEvent> transactionKafkaTemplate() {
-        return new KafkaTemplate<>(transactionProducerFactory());
+    public KafkaTemplate<String, OutgoingTransactionEvent> outgoingTemplate() {
+        return new KafkaTemplate<>(producerFactory());
     }
 
-    // ---------------- Producer TransactionResponseEvent ----------------
     @Bean
-    public ProducerFactory<String, TransactionResponseEvent> responseProducerFactory() {
+    public KafkaTemplate<String, TransactionResponseEvent> responseTemplate() {
+        return new KafkaTemplate<>(producerFactory());
+    }
+
+
+    // ===================== CONSUMER =====================
+
+    private <T> ConsumerFactory<String, T> consumerFactory(Class<T> eventClass) {
         Map<String, Object> config = new HashMap<>();
-        config.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        config.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
-        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
-        return new DefaultKafkaProducerFactory<>(config);
+        config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        config.put(ConsumerConfig.GROUP_ID_CONFIG, "bank-group");
+        config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+
+        JsonDeserializer<T> jsonDeserializer = new JsonDeserializer<>(eventClass);
+        jsonDeserializer.addTrustedPackages("*");
+
+        return new DefaultKafkaConsumerFactory<>(
+                config,
+                new StringDeserializer(),
+                jsonDeserializer
+        );
     }
 
     @Bean
-    public KafkaTemplate<String, TransactionResponseEvent> responseKafkaTemplate() {
-        return new KafkaTemplate<>(responseProducerFactory());
-    }
-
-    // ---------------- Consumer Factory (för både typer) ----------------
-    @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, TransactionEvent> transactionListenerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, TransactionEvent> factory =
+    public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(transactionConsumerFactory(TransactionEvent.class));
-        return factory;
-    }
 
-    @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> responseListenerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(transactionConsumerFactory(TransactionResponseEvent.class));
+        factory.setConsumerFactory(consumerFactory(Object.class));
         return factory;
-    }
-
-    private <T> ConsumerFactory<String, T> transactionConsumerFactory(Class<T> clazz) {
-        Map<String, Object> props = new HashMap<>();
-        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        props.put(ConsumerConfig.GROUP_ID_CONFIG, "bank-service");
-        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-        props.put(JsonDeserializer.TRUSTED_PACKAGES, "com.bankgood.bank.event");
-        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, clazz.getName());
-        return new DefaultKafkaConsumerFactory<>(props);
     }
 }

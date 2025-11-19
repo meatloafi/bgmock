@@ -2,8 +2,8 @@ package com.bankgood.bank.controller;
 
 import com.bankgood.bank.event.OutgoingTransactionEvent;
 import com.bankgood.bank.event.IncomingTransactionEvent;
-import com.bankgood.bank.model.OutgoingTransaction;
 import com.bankgood.bank.model.IncomingTransaction;
+import com.bankgood.bank.model.OutgoingTransaction;
 import com.bankgood.bank.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,61 +21,65 @@ public class TransactionController {
 
     // ===================== OUTGOING =====================
     @PostMapping("/outgoing")
-    public ResponseEntity<OutgoingTransaction> createOutgoing(@RequestBody OutgoingTransactionEvent event) {
-        return ResponseEntity.ok(service.createOutgoingTransaction(event));
+    public ResponseEntity<?> createOutgoing(@RequestBody OutgoingTransactionEvent event) {
+        return service.createOutgoingTransaction(event);
     }
 
     @GetMapping("/outgoing/{id}")
-    public ResponseEntity<OutgoingTransaction> getOutgoing(@PathVariable UUID id) {
-        return service.getOutgoingTransaction(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<?> getOutgoing(@PathVariable UUID id) {
+        return service.getOutgoingTransaction(id);
     }
 
     @GetMapping("/outgoing")
-    public List<OutgoingTransaction> getAllOutgoing() {
+    public ResponseEntity<List<OutgoingTransaction>> getAllOutgoing() {
         return service.getAllOutgoingTransactions();
     }
 
     @PutMapping("/outgoing/{id}")
-    public ResponseEntity<OutgoingTransaction> updateOutgoing(@PathVariable UUID id,
-                                                              @RequestBody OutgoingTransactionEvent event) {
-        OutgoingTransaction updated = service.updateOutgoingTransaction(id, event);
-        return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.notFound().build();
+    public ResponseEntity<?> updateOutgoing(@PathVariable UUID id, @RequestBody OutgoingTransactionEvent event) {
+        return service.updateOutgoingTransaction(id, event);
     }
 
     @DeleteMapping("/outgoing/{id}")
-    public void deleteOutgoing(@PathVariable UUID id) {
-        service.deleteOutgoingTransaction(id);
+    public ResponseEntity<?> deleteOutgoing(@PathVariable UUID id) {
+        return service.deleteOutgoingTransaction(id);
     }
 
     // ===================== INCOMING =====================
     @PostMapping("/incoming")
-    public ResponseEntity<IncomingTransaction> createIncoming(@RequestBody IncomingTransactionEvent event) {
-        return ResponseEntity.ok(service.createIncomingTransaction(event));
+    public ResponseEntity<?> createIncoming(@RequestBody IncomingTransactionEvent event) {
+        return service.createIncomingTransaction(event);
     }
 
     @GetMapping("/incoming/{id}")
-    public ResponseEntity<IncomingTransaction> getIncoming(@PathVariable UUID id) {
-        return service.getIncomingTransaction(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<?> getIncoming(@PathVariable UUID id) {
+        return service.getIncomingTransaction(id);
     }
 
     @GetMapping("/incoming")
-    public List<IncomingTransaction> getAllIncoming() {
+    public ResponseEntity<List<IncomingTransaction>> getAllIncoming() {
         return service.getAllIncomingTransactions();
     }
 
     @PutMapping("/incoming/{id}")
-    public ResponseEntity<IncomingTransaction> updateIncoming(@PathVariable UUID id,
-                                                              @RequestBody IncomingTransactionEvent event) {
-        IncomingTransaction updated = service.updateIncomingTransaction(id, event);
-        return updated != null ? ResponseEntity.ok(updated) : ResponseEntity.notFound().build();
+    public ResponseEntity<?> updateIncoming(@PathVariable UUID id, @RequestBody IncomingTransactionEvent event) {
+        return service.updateIncomingTransaction(id, event);
     }
 
     @DeleteMapping("/incoming/{id}")
-    public void deleteIncoming(@PathVariable UUID id) {
-        service.deleteIncomingTransaction(id);
+    public ResponseEntity<?> deleteIncoming(@PathVariable UUID id) {
+        return service.deleteIncomingTransaction(id);
+    }
+
+    // ===================== ACCOUNT =====================
+
+    @GetMapping("/outgoing/account/{accountId}")
+    public ResponseEntity<?> getOutgoingByAccount(@PathVariable UUID accountId) {
+        return service.getOutgoingTransactionsByAccount(accountId);
+    }
+
+    @GetMapping("/incoming/account/{accountId}")
+    public ResponseEntity<?> getIncomingByAccount(@PathVariable UUID accountId) {
+        return service.getIncomingTransactionsByAccount(accountId);
     }
 }

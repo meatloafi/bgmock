@@ -15,6 +15,8 @@ import lombok.*;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Setter
+@Getter
 public class OutgoingTransaction {
 
     @Id
