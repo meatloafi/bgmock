@@ -56,6 +56,8 @@ st.markdown("""
 if 'state_manager' not in st.session_state:
     st.session_state.state_manager = TransactionMonitor()
     st.session_state.simulator = TransactionSimulator(st.session_state.state_manager)
+
+if 'auto_refresh' not in st.session_state:
     st.session_state.auto_refresh = False
 
 def main():
