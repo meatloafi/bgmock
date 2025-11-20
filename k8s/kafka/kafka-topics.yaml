@@ -1,0 +1,76 @@
+# ============================
+# Topic 1 - Bank A initiates payment
+# Kafka topic: transactions.initiated
+# ============================
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: transactions-initiated
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: bgmock-kafka
+spec:
+  topicName: transactions.initiated
+  partitions: 3
+  replicas: 1
+  config:
+    retention.ms: 604800000   # 7 days
+
+---
+# ============================
+# Topic 2 - Clearing forwards to Bank B
+# Kafka topic: transactions.forwarded
+# Keyed by bank_b_id
+# ============================
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: transactions-forwarded
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: bgmock-kafka
+spec:
+  topicName: transactions.forwarded
+  partitions: 3
+  replicas: 1
+  config:
+    retention.ms: 604800000   # 7 days
+
+---
+# ============================
+# Topic 3 - Bank B processes the payment
+# Kafka topic: transactions.processed
+# ============================
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: transactions-processed
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: bgmock-kafka
+spec:
+  topicName: transactions.processed
+  partitions: 3
+  replicas: 1
+  config:
+    retention.ms: 604800000
+
+---
+# ============================
+# Topic 4 - Clearing completes payment & notifies Bank A
+# Kafka topic: transactions.completed
+# Keyed by bank_a_id
+# ============================
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: transactions-completed
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: bgmock-kafka
+spec:
+  topicName: transactions.completed
+  partitions: 3
+  replicas: 1
+  config:
+    retention.ms: 604800000
