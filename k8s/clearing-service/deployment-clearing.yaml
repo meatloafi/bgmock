@@ -1,76 +1,69 @@
-# k8s/bank-service/deployment-bank-a.yaml
-# Bank A Service Deployment
+# k8s/clearing-service/deployment-clearing.yaml
+# Clearing service deployment
 
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: bankgood-bank-a
+  name: bankgood-clearing
   labels:
-    app: bankgood-bank
-    bank: a
+    app: bankgood-clearing
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: bankgood-bank
-      bank: a
+      app: bankgood-clearing
   template:
     metadata:
       labels:
-        app: bankgood-bank
-        bank: a
+        app: bankgood-clearing
     spec:
       containers:
-        - name: bank-a
-          image: bank-service:latest
+        - name: clearing
+          image: clearing-service:latest
           imagePullPolicy: Never
           ports:
             - containerPort: 8080
               name: http
-          env:
+          env: 
             - name: SPRING_DATASOURCE_URL
-              value: "jdbc:postgresql://postgres-service-bank-a:5432/bank_a_db"
+              value: "jdbc:postgresql://postgres-service-clearing:5432/clearing_db"
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 configMapKeyRef:
-                  name: postgres-config-bank-a
+                  name: postgres-config-clearing
                   key: POSTGRES_USER
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secret-bank-a
+                  name: postgres-secret-clearing
                   key: POSTGRES_PASSWORD
             - name: SPRING_JPA_HIBERNATE_DDL_AUTO
               value: "update"
             - name: SPRING_APPLICATION_NAME
-              value: "bank-a-service"
-            - name: BANK_CLEARING_NUMBER
-              value: "000001"
+              value: "clearing-service"
 
             # Kafka config
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: "bgmock-kafka-kafka-plain-bootstrap.kafka.svc.cluster.local:9092"
-
             - name: SPRING_KAFKA_CONSUMER_GROUP_ID
-              value: "bank-a-service-group"
-
+              value: "clearing-service-group"
             - name: SPRING_KAFKA_PRODUCER_KEY_SERIALIZER
               value: "org.apache.kafka.common.serialization.StringSerializer"
             - name: SPRING_KAFKA_PRODUCER_VALUE_SERIALIZER
               value: "org.apache.kafka.common.serialization.StringSerializer"
-
             - name: SPRING_KAFKA_CONSUMER_KEY_DESERIALIZER
               value: "org.apache.kafka.common.serialization.StringDeserializer"
             - name: SPRING_KAFKA_CONSUMER_VALUE_DESERIALIZER
               value: "org.apache.kafka.common.serialization.StringDeserializer"
 
+
           livenessProbe:
             httpGet:
               path: /health
               port: 8080
-            initialDelaySeconds: 120
-            periodSeconds: 20
+            initialDelaySeconds: 60
+            periodSeconds: 15
             timeoutSeconds: 10
             failureThreshold: 3
 
@@ -78,11 +71,11 @@ spec:
             httpGet:
               path: /health
               port: 8080
-            initialDelaySeconds: 100
-            periodSeconds: 15
+            initialDelaySeconds: 45
+            periodSeconds: 10
             timeoutSeconds: 10
             failureThreshold: 3
-
+          
           resources:
             requests:
               memory: "512Mi"
@@ -95,18 +88,15 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: bankgood-bank-a-service
+  name: bankgood-clearing-service
   labels:
-    app: bankgood-bank
-    bank: a
+    app: bankgood-clearing
 spec:
-  type: NodePort
+  type: ClusterIP
   selector:
-    app: bankgood-bank
-    bank: a
+    app: bankgood-clearing
   ports:
     - protocol: TCP
       port: 8080
       targetPort: 8080
-      nodePort: 30081
       name: http
