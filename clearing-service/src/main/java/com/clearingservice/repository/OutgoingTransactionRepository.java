@@ -6,6 +6,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.Optional;
 import java.util.UUID;
 
-public interface TransactionRepository extends JpaRepository<OutgoingTransaction, UUID> {
+public interface OutgoingTransactionRepository extends JpaRepository<OutgoingTransaction, UUID> {
     Optional<OutgoingTransaction> findByTransactionId(UUID transactionId);
 }

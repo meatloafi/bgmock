@@ -10,5 +10,6 @@ import java.util.UUID;
 @Repository
 public interface BankMappingRepository extends JpaRepository<BankMapping, UUID> {
     Optional<BankMapping> findByBankgoodNumber(String bankgoodNumber);
+    boolean existsByBankgoodNumber(String bankgoodNumber);
 }
 
