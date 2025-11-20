@@ -12,17 +12,18 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "transactions")
+@Table(name = "outgoing_transactions")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Transaction {
+@Setter
+@Getter
+public class OutgoingTransaction {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(unique = true, updatable = false, nullable = false)
     private UUID transactionId;
-
 
     @Column(nullable = false)
     private UUID fromAccountId;
@@ -47,13 +48,23 @@ public class Transaction {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private TransactionStatus status;
+    private TransactionStatus status = TransactionStatus.PENDING; // PENDING, SUCCESS, FAILED
 
     @CreationTimestamp
     @Column(nullable = false)
-    private LocalDateTime createdAt;
+    private final LocalDateTime createdAt = LocalDateTime.now();
 
     @UpdateTimestamp
     @Column(nullable = false)
-    private LocalDateTime updatedAt;
+    private LocalDateTime updatedAt = this.createdAt;
+
+    public OutgoingTransaction(UUID fromAccountId, String fromClearingNumber, String fromAccountNumber,
+                               String toBankgoodNumber, BigDecimal amount) {
+        this.fromAccountId = fromAccountId;
+        this.fromClearingNumber = fromClearingNumber;
+        this.fromAccountNumber = fromAccountNumber;
+        this.toBankgoodNumber = toBankgoodNumber;
+        this.amount = amount;
+    }
+
 }
