@@ -10,9 +10,6 @@ import org.springframework.stereotype.Component;
 @Component
 public class TransactionEventListener {
 
-    @Value("${spring.kafka.consumer.group-id}")
-    private String groupId;
-
     private final TransactionService transactionService;
 
     public TransactionEventListener(TransactionService transactionService) {
@@ -20,13 +17,13 @@ public class TransactionEventListener {
     }
 
     // Konsumerar outgoing-transaktioner initierade av bank-service
-    @KafkaListener(topics = "transactions.initiated", groupId = "#{__listener.groupId}")
+    @KafkaListener(topics = "transactions.initiated", groupId = "${spring.kafka.consumer.group-id:clearing-service}")
     public void listenOutgoing(OutgoingTransactionEvent event) {
         transactionService.handleOutgoingTransaction(event);
     }
 
     // Konsumerar processed-transaktioner från bank-service (response)
-    @KafkaListener(topics = "transactions.processed", groupId = "#{__listener.groupId}")
+    @KafkaListener(topics = "transactions.processed", groupId = "${spring.kafka.consumer.group-id:clearing-service}")
     public void listenProcessed(TransactionResponseEvent event) {
         transactionService.handleProcessedTransaction(event);
     }
