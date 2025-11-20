@@ -213,8 +213,8 @@ public class TransactionService {
 
         TransactionResponseEvent response = new TransactionResponseEvent(
                 event.getTransactionId(),
-                success ? TransactionStatus.SUCCESS : TransactionStatus.FAILED,
-                success ? "Transaction processed" : "Insufficient funds"
+                success ? TransactionStatus.SUCCESS : TransactionStatus.FAILED, // Sätt rätt status
+                success ? "Transaction processed" : "Insufficient funds" // Sätt rätt message
         );
 
 

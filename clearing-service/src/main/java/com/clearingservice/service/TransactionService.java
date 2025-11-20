@@ -1,9 +1,8 @@
 package com.clearingservice.service;
 
-import com.clearingservice.event.TransactionEvent;
 import com.clearingservice.event.TransactionResponseEvent;
 import com.clearingservice.model.BankMapping;
-import com.clearingservice.model.Transaction;
+import com.clearingservice.model.OutgoingTransaction;
 import com.clearingservice.model.TransactionStatus;
 import com.clearingservice.repository.BankMappingRepository;
 import com.clearingservice.repository.TransactionRepository;
@@ -49,7 +48,7 @@ public class TransactionService {
                 .orElse(null);
 
         // Skapa transaktion i DB
-        Transaction tx = new Transaction();
+        OutgoingTransaction tx = new OutgoingTransaction();
         tx.setTransactionId(dto.getTransactionId());
         tx.setFromAccountNumber(dto.getFromAccountNumber());
         tx.setFromClearingNumber(dto.getFromClearingNumber());
@@ -122,7 +121,7 @@ public class TransactionService {
      */
     @Transactional
     public void handleBankResponse(TransactionResponseEvent response) {
-        Transaction tx = transactionRepository.findByTransactionId(response.getTransactionId())
+        OutgoingTransaction tx = transactionRepository.findByTransactionId(response.getTransactionId())
                 .orElseThrow(() -> new RuntimeException("Transaction not found: " + response.getTransactionId()));
 
         // Uppdatera status i DB
@@ -151,7 +150,7 @@ public class TransactionService {
     /**
      * Konverterar Transaction → TransactionEvent för forwarding
      */
-    private TransactionEvent toEvent(Transaction tx) {
+    private TransactionEvent toEvent(OutgoingTransaction tx) {
         return new TransactionEvent(
                 tx.getTransactionId(),
                 null, // fromAccountId används ej i clearing

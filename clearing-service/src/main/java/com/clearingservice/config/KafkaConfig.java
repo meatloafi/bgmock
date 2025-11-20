@@ -1,6 +1,5 @@
 package com.clearingservice.config;
 
-import com.clearingservice.event.TransactionEvent;
 import com.clearingservice.event.TransactionResponseEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;

@@ -1,6 +1,5 @@
 package com.clearingservice.kafka;
 
-import com.clearingservice.event.TransactionEvent;
 import com.clearingservice.event.TransactionResponseEvent;
 import com.clearingservice.service.TransactionService;
 import lombok.RequiredArgsConstructor;
