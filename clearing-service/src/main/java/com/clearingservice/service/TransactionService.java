@@ -71,6 +71,8 @@ public class TransactionService {
         // 2. Kontrollera bankgiro → clearing + account
         Optional<BankMapping> mappingOpt = mappingRepo.findByBankgoodNumber(event.getToBankgoodNumber());
 
+        // TODO, fixa rätt bankmapping för lookup
+        /*
         if (mappingOpt.isEmpty()) {
             log.warn("No mapping found for bankgiro {}", event.getToBankgoodNumber());
 
@@ -104,6 +106,20 @@ public class TransactionService {
 
         log.info("Forwarded incoming transaction to bank {} for account {}",
                 mapping.getClearingNumber(), mapping.getAccountNumber());
+
+         */ // TODO, ta bort allt som är kommenterat när bankMapping är klar.
+
+        forwardedTemplate.send(TOPIC_FORWARDED,
+                "00001",
+                new IncomingTransactionEvent(
+                        event.getTransactionId(),
+                        "00001",
+                        "1",
+                        event.getAmount(),
+                        TransactionStatus.PENDING,
+                        event.getCreatedAt(),
+                        LocalDateTime.now())); // TODO, ta bort denna detta när bankmapping är klart, det är hårdkodat.
+
 
         return ResponseEntity.ok("Outgoing transaction processed and forwarded");
     }
