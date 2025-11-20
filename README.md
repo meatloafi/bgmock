@@ -70,6 +70,11 @@ eval $(minikube docker-env)
 kubectl apply -f k8s/kafka/
 kubectl apply -f k8s/postgres/
 
+
+# Note: Wait until all pods show READY=1/1 (or appropriate replica count) before deploying services.
+kubectl get pods -w
+kubectl get pods -n kafka -w
+
 # Deploy services
 kubectl apply -f k8s/bank-service/
 kubectl apply -f k8s/clearing-service/
