@@ -1,6 +1,6 @@
 package com.bankgood.bank.controller;
 
-import com.bankgood.bank.model.Account;
+import com.bankgood.common.event.AccountDTO;
 import com.bankgood.bank.service.AccountService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,25 +20,23 @@ public class AccountController {
     private final AccountService accountService;
 
     @PostMapping
-    public ResponseEntity<Account> createAccount(@Valid @RequestBody Account account) {
-        Account created = accountService.createAccount(account);
-        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    public ResponseEntity<AccountDTO> createAccount(@Valid @RequestBody AccountDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(accountService.createAccount(dto));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Account> getAccount(@PathVariable UUID id) {
+    public ResponseEntity<AccountDTO> getAccount(@PathVariable UUID id) {
         return ResponseEntity.ok(accountService.getAccount(id));
     }
 
     @GetMapping
-    public ResponseEntity<List<Account>> getAllAccounts() {
+    public ResponseEntity<List<AccountDTO>> getAllAccounts() {
         return ResponseEntity.ok(accountService.getAllAccounts());
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Account> updateAccount(@PathVariable UUID id, @Valid @RequestBody Account account) {
-        account.setAccountId(id);
-        return ResponseEntity.ok(accountService.updateAccount(account));
+    public ResponseEntity<AccountDTO> updateAccount(@PathVariable UUID id, @Valid @RequestBody AccountDTO dto) {
+        return ResponseEntity.ok(accountService.updateAccount(id, dto));
     }
 
     @DeleteMapping("/{id}")
@@ -47,10 +45,8 @@ public class AccountController {
         return ResponseEntity.noContent().build();
     }
 
-    // Endpoint to adjust balance (positive or negative)
     @PostMapping("/{id}/adjust")
-    public ResponseEntity<Account> adjustBalance(@PathVariable UUID id, @RequestParam BigDecimal amount) {
-        accountService.adjustBalance(id, amount);
-        return ResponseEntity.ok(accountService.getAccount(id));
+    public ResponseEntity<AccountDTO> adjustBalance(@PathVariable UUID id, @RequestParam BigDecimal amount) {
+        return ResponseEntity.ok(accountService.adjustBalance(id, amount));
     }
 }

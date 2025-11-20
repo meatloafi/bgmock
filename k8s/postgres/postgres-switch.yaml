@@ -1,21 +1,21 @@
-# k8s/postgres/postgres-switch.yaml
-# PostgreSQL for Transaction Switch/Audit Log
+# k8s/postgres/postgres-clearing.yaml
+# PostgreSQL for Transaction clearing/Audit Log
 
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: postgres-config-switch
+  name: postgres-config-clearing
   namespace: default
 data:
-  POSTGRES_DB: switch_db
-  POSTGRES_USER: switch_user
+  POSTGRES_DB: clearing_db
+  POSTGRES_USER: clearing_user
 
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: postgres-secret-switch
+  name: postgres-secret-clearing
   namespace: default
 type: Opaque
 stringData:
@@ -25,7 +25,7 @@ stringData:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: postgres-pvc-switch
+  name: postgres-pvc-clearing
   namespace: default
 spec:
   accessModes:
@@ -38,18 +38,18 @@ spec:
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: postgres-switch
+  name: postgres-clearing
   namespace: default
 spec:
-  serviceName: postgres-service-switch
+  serviceName: postgres-service-clearing
   replicas: 1
   selector:
     matchLabels:
-      app: postgres-switch
+      app: postgres-clearing
   template:
     metadata:
       labels:
-        app: postgres-switch
+        app: postgres-clearing
     spec:
       containers:
         - name: postgres
@@ -59,9 +59,9 @@ spec:
               name: postgres
           envFrom:
             - configMapRef:
-                name: postgres-config-switch
+                name: postgres-config-clearing
             - secretRef:
-                name: postgres-secret-switch
+                name: postgres-secret-clearing
           volumeMounts:
             - name: postgres-storage
               mountPath: /var/lib/postgresql/data
@@ -75,29 +75,33 @@ spec:
               cpu: "500m"
           livenessProbe:
             exec:
-              command: ["pg_isready", "-U", "switch_user", "-d", "switch_db"]
-            initialDelaySeconds: 30
-            periodSeconds: 10
+              command: ["pg_isready", "-U", "clearing_user", "-d", "clearing_db"]
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "switch_user", "-d", "switch_db"]
-            initialDelaySeconds: 10
-            periodSeconds: 5
+              command: ["pg_isready", "-U", "clearing_user", "-d", "clearing_db"]
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 3
       volumes:
         - name: postgres-storage
           persistentVolumeClaim:
-            claimName: postgres-pvc-switch
+            claimName: postgres-pvc-clearing
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: postgres-service-switch
+  name: postgres-service-clearing
   namespace: default
 spec:
   type: ClusterIP
   selector:
-    app: postgres-switch
+    app: postgres-clearing
   ports:
     - port: 5432
       targetPort: 5432

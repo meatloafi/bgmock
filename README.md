@@ -53,13 +53,8 @@ mvn test
 ### 3. Build Docker Images
 
 ```bash
-# Bank Service
-cd bank-service
-docker build -t bank-service:latest .
-
-# Clearing Service
-cd ../clearing-service
-docker build -t clearing-service:latest .
+docker build -f bank-service/Dockerfile -t bank-service:latest .
+docker build -f clearing-service/Dockerfile -t clearing-service:latest .
 ```
 
 ### 4. Deploy to Kubernetes
@@ -74,6 +69,11 @@ eval $(minikube docker-env)
 # Deploy infrastructure
 kubectl apply -f k8s/kafka/
 kubectl apply -f k8s/postgres/
+
+
+# Note: Wait until all pods show READY=1/1 (or appropriate replica count) before deploying services.
+kubectl get pods -w
+kubectl get pods -n kafka -w
 
 # Deploy services
 kubectl apply -f k8s/bank-service/

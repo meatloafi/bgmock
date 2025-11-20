@@ -12,12 +12,8 @@ import java.util.UUID;
 @AllArgsConstructor
 @Setter
 @Getter
-public class TransactionEvent {
+public class IncomingTransactionEvent {
     private UUID transactionId;
-    private UUID fromAccountId;
-    private String fromClearingNumber;
-    private String fromAccountNumber;
-    private String toBankgoodNumber;
     private String toClearingNumber;
     private String toAccountNumber;
     private BigDecimal amount;

@@ -15,13 +15,15 @@ import java.util.UUID;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Getter
+@Setter
 public class Transaction {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true) // TODO, kolla om det räcker med endast en id.
     private UUID transactionId; // samma som i TransactionDTO
 
     @Column(nullable = false)
@@ -43,11 +45,12 @@ public class Transaction {
     @Column(nullable = false)
     private TransactionStatus status; // PENDING, SUCCESS, FAILED
 
-    private String failureReason;
-
     @CreationTimestamp
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    @Column(nullable = true)
+    private String message; 
 }

@@ -1,6 +1,9 @@
 package com.bankgood.common.event;
 
 import com.bankgood.common.model.TransactionStatus;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -12,7 +15,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @Setter
 @Getter
-public class TransactionEvent {
+public class OutgoingTransactionEvent {
     private UUID transactionId;
     private UUID fromAccountId;
     private String fromClearingNumber;

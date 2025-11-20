@@ -76,13 +76,17 @@ spec:
           livenessProbe:
             exec:
               command: ["pg_isready", "-U", "bank_a_user", "-d", "bank_a_db"]
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
           readinessProbe:
             exec:
               command: ["pg_isready", "-U", "bank_a_user", "-d", "bank_a_db"]
-            initialDelaySeconds: 10
-            periodSeconds: 5
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 3
       volumes:
         - name: postgres-storage
           persistentVolumeClaim:

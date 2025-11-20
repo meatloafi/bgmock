@@ -189,7 +189,7 @@ public class KafkaIntegrationTest {
                     Optional<Transaction> updatedTx = transactionRepository.findByTransactionId(tx.getTransactionId());
                     assertThat(updatedTx).isPresent();
                     assertThat(updatedTx.get().getStatus()).isEqualTo(TransactionStatus.SUCCESS);
-                    assertThat(updatedTx.get().getFailureReason()).isEqualTo("Transaction completed");
+                    assertThat(updatedTx.get().getMessage()).isEqualTo("Transaction completed");
                 });
 
         System.out.println("✓ TransactionResponseListener test passed!");
@@ -257,7 +257,7 @@ public class KafkaIntegrationTest {
                     Optional<Transaction> successTx = transactionRepository.findByTransactionId(txId);
                     assertThat(successTx).isPresent();
                     assertThat(successTx.get().getStatus()).isEqualTo(TransactionStatus.SUCCESS);
-                    assertThat(successTx.get().getFailureReason()).isEqualTo("Funds received successfully");
+                    assertThat(successTx.get().getMessage()).isEqualTo("Funds received successfully");
                 });
 
         System.out.println("✓ Step 2: Response received from Bank B and forwarded to Bank A");
@@ -301,7 +301,7 @@ public class KafkaIntegrationTest {
                     Optional<Transaction> failedTx = transactionRepository.findByTransactionId(txId);
                     assertThat(failedTx).as("Transaction should be saved in database").isPresent();
                     assertThat(failedTx.get().getStatus()).isEqualTo(TransactionStatus.FAILED);
-                    assertThat(failedTx.get().getFailureReason()).contains("not found");
+                    assertThat(failedTx.get().getMessage()).contains("not found");
                 });
 
         System.out.println("✓ Error scenario test passed - Bank mapping not found handled correctly!");
@@ -365,7 +365,7 @@ public class KafkaIntegrationTest {
                     Optional<Transaction> failedTx = transactionRepository.findByTransactionId(txId);
                     assertThat(failedTx).isPresent();
                     assertThat(failedTx.get().getStatus()).isEqualTo(TransactionStatus.FAILED);
-                    assertThat(failedTx.get().getFailureReason()).isEqualTo("Insufficient funds");
+                    assertThat(failedTx.get().getMessage()).isEqualTo("Insufficient funds");
                 });
 
         System.out.println("✓ Error scenario test passed - Bank B failure handled correctly!");

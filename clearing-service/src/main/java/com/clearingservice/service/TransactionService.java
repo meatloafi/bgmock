@@ -61,7 +61,7 @@ public class TransactionService {
             // Recipient not found → FAILED
             log.warn("❌ Recipient not found for bankgood number {}", dto.getToBankgoodNumber());
             tx.setStatus(TransactionStatus.FAILED);
-            tx.setFailureReason("Recipient not found");
+            tx.setMessage("Recipient not found");
             transactionRepository.save(tx);
 
             // Send immediate failure response to Bank A
@@ -101,7 +101,7 @@ public class TransactionService {
                         // Mark transaction as FAILED
                         transactionRepository.findByTransactionId(event.getTransactionId()).ifPresent(tx -> {
                             tx.setStatus(TransactionStatus.FAILED);
-                            tx.setFailureReason("Failed to forward transaction");
+                            tx.setMessage("Failed to forward transaction");
                             tx.setUpdatedAt(LocalDateTime.now());
                             transactionRepository.save(tx);
 
@@ -127,7 +127,7 @@ public class TransactionService {
 
         // Update status in DB
         tx.setStatus(response.getStatus());
-        tx.setFailureReason(response.getMessage());
+        tx.setMessage(response.getMessage());
         tx.setUpdatedAt(LocalDateTime.now());
         transactionRepository.save(tx);
 
