@@ -4,9 +4,8 @@ from typing import Optional, List, Dict, Any
 from decimal import Decimal
 import logging
 
-from ..models.transaction import TransactionEvent, TransactionResponseEvent
-from ..models.account import Account
-from ..config import ServiceConfig
+from models.transaction import TransactionEvent, TransactionResponseEvent, Account
+from config import ServiceConfig
 
 logger = logging.getLogger(__name__)
 

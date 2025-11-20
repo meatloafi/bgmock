@@ -6,34 +6,40 @@ from decimal import Decimal
 from typing import Optional, List
 import uuid
 
-from ..clients.rest_client import BankServiceClient, ClearingServiceClient
-from ..clients.kafka_client import KafkaClient
-from ..models.transaction import TransactionEvent, TransactionStatus
-from ..models.account import Account
-from ..simulator.state_manager import StateManager
-from ..config import config
+from clients.rest_client import BankServiceClient, ClearingServiceClient
+from clients.kafka_client import KafkaClient
+from models.transaction import TransactionEvent, TransactionStatus, Account
+from simulator.transaction_monitor import TransactionMonitor
+from config import config
 
 logger = logging.getLogger(__name__)
 
 class TransactionSimulator:
     """Main simulator orchestrating transactions"""
-    
-    def __init__(self, state_manager: StateManager):
+
+    def __init__(self, state_manager: TransactionMonitor):
+        """Initialize the transaction simulator with all required clients and monitoring"""
         self.state_manager = state_manager
-        
-        # Initialize clients
+
+        # Initialize all service clients (REST and Kafka)
+        # These clients handle communication with bank services and message broker
         self.bank_a_client = BankServiceClient(config.bank_a)
         self.bank_b_client = BankServiceClient(config.bank_b)
         self.clearing_client = ClearingServiceClient(config.clearing_service_url)
         self.kafka_client = KafkaClient()
-        
-        # Subscribe to all relevant Kafka topics
-        self._setup_kafka_subscriptions()
-        
-        # Initialize accounts
+
+        # Report Kafka availability to monitoring (graceful degradation if offline)
+        self.state_manager.update_service_health("kafka", self.kafka_client.kafka_available)
+
+        # Subscribe to Kafka topics only if broker is available
+        # This prevents errors when running in offline mode
+        if self.kafka_client.kafka_available:
+            self._setup_kafka_subscriptions()
+
+        # Create test accounts in both banks for simulation
         self._initialize_test_accounts()
-        
-        # Start health monitoring
+
+        # Start background thread to continuously monitor service health
         self._start_health_monitoring()
     
     def _setup_kafka_subscriptions(self):

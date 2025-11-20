@@ -11,14 +11,22 @@ import json
 from datetime import datetime, timedelta
 import plotly.graph_objects as go
 import plotly.express as px
+from plotly.subplots import make_subplots
 import pandas as pd
 from typing import Dict, List
 
 # Import simulator modules
 import sys
-sys.path.insert(0, '/app/src')
+from pathlib import Path
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from decimal import Decimal
+from simulator.transaction_simulator import TransactionSimulator
+from simulator.transaction_monitor import TransactionMonitor
+from models.transaction import TransactionStatus
 from simulator.chaos_engine import get_chaos_engine, FailureType
 from simulator.load_tester import get_load_tester, LoadProfile
+from config import config
 
 # Configuration
 st.set_page_config(
@@ -43,6 +51,12 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+# Initialize session state
+if 'state_manager' not in st.session_state:
+    st.session_state.state_manager = TransactionMonitor()
+    st.session_state.simulator = TransactionSimulator(st.session_state.state_manager)
+    st.session_state.auto_refresh = False
 
 def main():
     st.title("🏦 BGMock Banking System - Digital Twin")
@@ -112,12 +126,13 @@ def main():
     
     # Main content area
     tabs = st.tabs([
-        "📊 Dashboard", 
-        "💳 Accounts", 
-        "📝 Transactions", 
-        "🔄 Kafka Events", 
+        "📊 Dashboard",
+        "💳 Accounts",
+        "📝 Transactions",
+        "🔄 Kafka Events",
         "🌐 REST Calls",
-        "📈 Analytics"
+        "📈 Analytics",
+        "🔧 Advanced Testing"
     ])
     
     with tabs[0]:
@@ -137,6 +152,9 @@ def main():
     
     with tabs[5]:
         render_analytics()
+
+    with tabs[6]:
+        render_advanced_testing()
 
 def render_dashboard():
     """Render main dashboard"""
@@ -396,6 +414,179 @@ def render_analytics():
             file_name=f"bgmock_state_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
             mime="application/json"
         )
+
+def render_advanced_testing():
+    """Render advanced testing tools: Chaos Engineering and Load Testing"""
+    st.header("🔧 Advanced Testing")
+
+    # Create two columns for Chaos and Load Testing
+    col1, col2 = st.columns(2)
+
+    # Chaos Engineering Section
+    with col1:
+        st.subheader("🌪️ Chaos Engineering")
+        st.markdown("Test system resilience by injecting failures")
+
+        # Initialize chaos engine in session state if not present
+        if 'chaos_engine' not in st.session_state:
+            st.session_state.chaos_engine = get_chaos_engine()
+
+        chaos = st.session_state.chaos_engine
+
+        # Toggle chaos engine
+        chaos.enabled = st.checkbox("Enable Chaos Engine", value=chaos.enabled)
+
+        if chaos.enabled:
+            st.divider()
+
+            # Network Delay Injection
+            with st.expander("💤 Network Delay", expanded=False):
+                service = st.selectbox(
+                    "Service",
+                    ["bank-a", "bank-b", "clearing"],
+                    key="chaos_delay_service"
+                )
+                delay_ms = st.slider("Delay (ms)", 100, 5000, 1000, key="chaos_delay_ms")
+                duration = st.slider("Duration (seconds)", 10, 300, 60, key="chaos_delay_duration")
+
+                if st.button("Inject Network Delay", key="chaos_delay_btn"):
+                    event_id = chaos.inject_network_delay(service, delay_ms, duration)
+                    st.success(f"✅ Injected {delay_ms}ms delay to {service} for {duration}s (ID: {event_id[:8]}...)")
+
+            # Service Outage
+            with st.expander("🔴 Service Outage", expanded=False):
+                outage_service = st.selectbox(
+                    "Service",
+                    ["bank-a", "bank-b", "clearing"],
+                    key="chaos_outage_service"
+                )
+                outage_duration = st.slider("Duration (seconds)", 10, 300, 30, key="chaos_outage_duration")
+
+                if st.button("Simulate Outage", key="chaos_outage_btn"):
+                    event_id = chaos.simulate_service_outage(outage_service, outage_duration)
+                    st.warning(f"⚠️ Simulated {outage_service} outage for {outage_duration}s (ID: {event_id[:8]}...)")
+
+            # Random Transaction Failures
+            with st.expander("🎲 Random Failures", expanded=False):
+                probability = st.slider("Failure Probability", 0.0, 1.0, 0.3, 0.05, key="chaos_prob")
+                random_duration = st.slider("Duration (seconds)", 10, 300, 60, key="chaos_random_duration")
+
+                if st.button("Enable Random Failures", key="chaos_random_btn"):
+                    event_id = chaos.fail_transaction_randomly(probability, random_duration)
+                    st.warning(f"⚠️ Random failures ({probability*100:.0f}%) enabled for {random_duration}s (ID: {event_id[:8]}...)")
+
+            st.divider()
+
+            # Active Chaos Events
+            st.markdown("**Active Chaos Events:**")
+            if chaos.active_failures:
+                for event_id, event in chaos.active_failures.items():
+                    # Check if event is still active (not expired)
+                    if datetime.now() < event.end_time:
+                        time_left = (event.end_time - datetime.now()).seconds
+                        st.info(f"🔥 {event.description} - {time_left}s remaining")
+                    else:
+                        st.text(f"✅ {event.description} - Completed")
+            else:
+                st.text("No active chaos events")
+        else:
+            st.info("Chaos engine is disabled. Enable it to start injecting failures.")
+
+    # Load Testing Section
+    with col2:
+        st.subheader("📊 Load Testing")
+        st.markdown("Generate load to test system performance")
+
+        # Initialize load tester in session state if not present
+        if 'load_tester' not in st.session_state:
+            st.session_state.load_tester = get_load_tester(
+                config.bank_a.base_url,
+                config.bank_b.base_url,
+                config.clearing_service_url
+            )
+
+        tester = st.session_state.load_tester
+
+        st.divider()
+
+        # Load Test Configuration
+        with st.form("load_test_form"):
+            st.markdown("**Load Test Configuration:**")
+
+            tps = st.slider("Target TPS (Transactions Per Second)", 1, 100, 10)
+            test_duration = st.slider("Duration (seconds)", 10, 300, 60)
+
+            profile = st.selectbox(
+                "Load Profile",
+                [p.value for p in LoadProfile],
+                format_func=lambda x: x.capitalize()
+            )
+
+            profile_help = {
+                "constant": "Constant transaction rate throughout test",
+                "ramp": "Gradually increase from 0 to target TPS",
+                "spike": "Sudden spike to target TPS, then back down",
+                "wave": "Oscillating wave pattern"
+            }
+            st.info(f"ℹ️ {profile_help.get(profile, '')}")
+
+            start_load_test = st.form_submit_button("🚀 Start Load Test", use_container_width=True)
+
+        # Run load test
+        if start_load_test:
+            with st.spinner(f"Running {profile} load test ({tps} TPS for {test_duration}s)..."):
+                try:
+                    # Use the simulator to generate transactions instead
+                    # This is a simplified version - actual load_tester needs transaction simulator
+                    num_transactions = tps * test_duration
+                    st.session_state.simulator.run_simulation(
+                        num_transactions=num_transactions,
+                        delay=1.0/tps
+                    )
+
+                    st.success(f"✅ Load test completed! Generated ~{num_transactions} transactions")
+
+                    # Display basic stats
+                    stats = st.session_state.state_manager.get_statistics()
+                    col_a, col_b, col_c = st.columns(3)
+                    with col_a:
+                        st.metric("Total", stats["total_transactions"])
+                    with col_b:
+                        st.metric("Success", stats["successful_transactions"])
+                    with col_c:
+                        success_rate = stats["successful_transactions"] / max(stats["total_transactions"], 1) * 100
+                        st.metric("Success Rate", f"{success_rate:.1f}%")
+
+                except Exception as e:
+                    st.error(f"❌ Load test failed: {str(e)}")
+
+        st.divider()
+
+        # Load Test History
+        st.markdown("**Recent Performance:**")
+        stats = st.session_state.state_manager.get_statistics()
+
+        # Calculate current throughput from REST calls
+        recent_calls = st.session_state.state_manager.get_rest_calls(50)
+        if recent_calls and len(recent_calls) > 1:
+            df_calls = pd.DataFrame(recent_calls)
+            df_calls['timestamp'] = pd.to_datetime(df_calls['timestamp'])
+
+            # Calculate throughput (calls per second)
+            time_span = (df_calls['timestamp'].max() - df_calls['timestamp'].min()).total_seconds()
+            if time_span > 0:
+                throughput = len(recent_calls) / time_span
+                avg_response = df_calls['response_time'].mean() * 1000  # Convert to ms
+
+                metric_col1, metric_col2 = st.columns(2)
+                with metric_col1:
+                    st.metric("Throughput", f"{throughput:.2f} req/s")
+                with metric_col2:
+                    st.metric("Avg Response", f"{avg_response:.1f} ms")
+            else:
+                st.text("Not enough data to calculate throughput")
+        else:
+            st.text("No performance data available yet")
 
 if __name__ == "__main__":
     main()

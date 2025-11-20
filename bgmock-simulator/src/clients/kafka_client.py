@@ -6,8 +6,8 @@ from typing import Callable, Dict, Any, Optional
 from confluent_kafka import Producer, Consumer, KafkaError
 from confluent_kafka.admin import AdminClient, NewTopic
 
-from ..config import config
-from ..models.transaction import TransactionEvent, TransactionResponseEvent
+from config import config
+from models.transaction import TransactionEvent, TransactionResponseEvent
 
 logger = logging.getLogger(__name__)
 
@@ -19,21 +19,31 @@ class KafkaClient:
             'bootstrap.servers': config.kafka_bootstrap_servers,
             'client.id': 'digital-twin-producer'
         }
-        
+
         self.consumer_config = {
             'bootstrap.servers': config.kafka_bootstrap_servers,
             'group.id': config.kafka_group_id,
             'auto.offset.reset': 'earliest',
             'enable.auto.commit': True
         }
-        
-        self.producer = Producer(self.producer_config)
+
+        self.producer = None
         self.consumers = {}
         self.consumer_threads = {}
         self.callbacks = {}
-        
-        # Create topics if they don't exist
-        self._ensure_topics_exist()
+        self.kafka_available = False
+
+        # Graceful degradation: Try to connect to Kafka, but don't crash if unavailable
+        # This allows the simulator to run in offline mode for demos and development
+        try:
+            self.producer = Producer(self.producer_config)
+            self._ensure_topics_exist()  # Auto-create missing topics
+            self.kafka_available = True
+            logger.info("Kafka connection established successfully")
+        except Exception as e:
+            # Log warning but continue - all Kafka operations will check kafka_available flag
+            logger.warning(f"Kafka not available: {e}. Simulator will run in offline mode.")
+            self.kafka_available = False
     
     def _ensure_topics_exist(self):
         """Create Kafka topics if they don't exist"""
@@ -59,12 +69,18 @@ class KafkaClient:
     
     def send_transaction_event(self, topic: str, event: TransactionEvent):
         """Send a transaction event to Kafka"""
+        # Guard clause: Skip if Kafka is unavailable (offline mode)
+        if not self.kafka_available:
+            logger.warning(f"Kafka not available - transaction {event.transaction_id} not sent")
+            return
+
         try:
+            # Asynchronous send - callback will be called when message is acknowledged
             self.producer.produce(
                 topic=topic,
-                key=event.transaction_id,
-                value=event.to_json(),
-                callback=self._delivery_callback
+                key=event.transaction_id,  # Key for partitioning
+                value=event.to_json(),      # Serialize to JSON
+                callback=self._delivery_callback  # Called on success/failure
             )
             self.producer.flush()
             logger.info(f"Sent transaction {event.transaction_id} to {topic}")
@@ -73,6 +89,10 @@ class KafkaClient:
     
     def send_response_event(self, topic: str, response: TransactionResponseEvent):
         """Send a response event to Kafka"""
+        if not self.kafka_available:
+            logger.warning(f"Kafka not available - response {response.transaction_id} not sent")
+            return
+
         try:
             self.producer.produce(
                 topic=topic,
@@ -87,24 +107,31 @@ class KafkaClient:
     
     def subscribe(self, topic: str, callback: Callable[[str, Dict], None]):
         """Subscribe to a Kafka topic with a callback"""
+        if not self.kafka_available:
+            logger.warning(f"Kafka not available - cannot subscribe to {topic}")
+            return
+
         if topic in self.consumers:
             logger.warning(f"Already subscribed to {topic}")
             return
-        
-        consumer = Consumer(self.consumer_config)
-        consumer.subscribe([topic])
-        self.consumers[topic] = consumer
-        self.callbacks[topic] = callback
-        
-        # Start consumer thread
-        thread = threading.Thread(
-            target=self._consume_loop,
-            args=(topic, consumer, callback),
-            daemon=True
-        )
-        thread.start()
-        self.consumer_threads[topic] = thread
-        logger.info(f"Subscribed to topic: {topic}")
+
+        try:
+            consumer = Consumer(self.consumer_config)
+            consumer.subscribe([topic])
+            self.consumers[topic] = consumer
+            self.callbacks[topic] = callback
+
+            # Start consumer thread
+            thread = threading.Thread(
+                target=self._consume_loop,
+                args=(topic, consumer, callback),
+                daemon=True
+            )
+            thread.start()
+            self.consumer_threads[topic] = thread
+            logger.info(f"Subscribed to topic: {topic}")
+        except Exception as e:
+            logger.error(f"Failed to subscribe to {topic}: {e}")
     
     def _consume_loop(self, topic: str, consumer: Consumer, callback: Callable):
         """Consumer loop running in separate thread"""
@@ -158,4 +185,5 @@ class KafkaClient:
         """Clean shutdown"""
         for topic in list(self.consumers.keys()):
             self.unsubscribe(topic)
-        self.producer.flush()
+        if self.producer:
+            self.producer.flush()

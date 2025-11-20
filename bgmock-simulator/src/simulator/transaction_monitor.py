@@ -1,4 +1,4 @@
-# src/simulator/state_manager.py
+# src/simulator/transaction_monitor.py
 import threading
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -6,11 +6,10 @@ from decimal import Decimal
 import json
 from collections import deque
 
-from ..models.transaction import TransactionEvent, TransactionResponseEvent, TransactionStatus
-from ..models.account import Account
+from models.transaction import TransactionEvent, TransactionResponseEvent, TransactionStatus, Account
 
-class StateManager:
-    """Manages the digital twin state - in-memory mirror of the system"""
+class TransactionMonitor:
+    """Monitors transaction state, events, and system health in real-time"""
     
     def __init__(self):
         self.lock = threading.RLock()
