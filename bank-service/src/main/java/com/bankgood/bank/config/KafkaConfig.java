@@ -1,6 +1,7 @@
 package com.bankgood.bank.config;
 
 import com.bankgood.common.event.OutgoingTransactionEvent;
+import com.bankgood.common.event.TransactionEvent;
 import com.bankgood.common.event.TransactionResponseEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -11,8 +12,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.kafka.annotation.EnableKafka;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
-import org.springframework.kafka.core.KafkaTemplate;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.core.*;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
@@ -37,6 +36,13 @@ public class KafkaConfig {
         return new DefaultKafkaProducerFactory<>(config);
     }
 
+    // Generic KafkaTemplate for any Object
+    @Bean
+    public KafkaTemplate<String, Object> kafkaTemplate() {
+        return new KafkaTemplate<>(producerFactory());
+    }
+
+    // Specific KafkaTemplates
     @Bean
     public KafkaTemplate<String, OutgoingTransactionEvent> outgoingTemplate() {
         return new KafkaTemplate<>(producerFactory());
@@ -46,7 +52,6 @@ public class KafkaConfig {
     public KafkaTemplate<String, TransactionResponseEvent> responseTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
-
 
     // ===================== CONSUMER =====================
 
@@ -62,16 +67,28 @@ public class KafkaConfig {
         return new DefaultKafkaConsumerFactory<>(
                 config,
                 new StringDeserializer(),
-                jsonDeserializer
-        );
+                jsonDeserializer);
     }
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
-
+        ConcurrentKafkaListenerContainerFactory<String, Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory(Object.class));
         return factory;
     }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, TransactionEvent> transactionListenerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, TransactionEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory(TransactionEvent.class));
+        return factory;
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> responseListenerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory(TransactionResponseEvent.class));
+        return factory;
+    }
+
 }
