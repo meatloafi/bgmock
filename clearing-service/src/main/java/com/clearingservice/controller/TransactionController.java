@@ -1,21 +1,33 @@
 package com.clearingservice.controller;
 
+import com.clearingservice.event.OutgoingTransactionEvent;
+import com.clearingservice.event.TransactionResponseEvent;
 import com.clearingservice.service.TransactionService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
-@RequestMapping("/api/clearing")
-@RequiredArgsConstructor
+@RequestMapping("/clearing/transactions")
 public class TransactionController {
 
-    private final TransactionService service;
+    private final TransactionService transactionService;
 
-    // Initierar en betalning
-    @PostMapping("/transfer")
-    public ResponseEntity<Void> initiateTransfer(@RequestBody TransactionEvent transactionEvent) {
-        service.processIncomingTransaction(transactionEvent);
-        return ResponseEntity.ok().build();
+    public TransactionController(TransactionService transactionService) {
+        this.transactionService = transactionService;
+    }
+
+    // ===================== OUTGOING TRANSACTIONS =====================
+
+    @PostMapping("/outgoing")
+    public ResponseEntity<?> createOutgoingTransaction(@RequestBody OutgoingTransactionEvent event) {
+        return transactionService.handleOutgoingTransaction(event);
+    }
+
+    // Endpoint för att simulera att en bank skickar processed-response (för test)
+    @PostMapping("/processed")
+    public ResponseEntity<?> handleProcessedTransaction(@RequestBody TransactionResponseEvent event) {
+        return transactionService.handleProcessedTransaction(event);
     }
 }

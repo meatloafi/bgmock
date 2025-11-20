@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/transactions")
+@RequestMapping("/bank/transactions")
 @RequiredArgsConstructor
 public class TransactionController {
 

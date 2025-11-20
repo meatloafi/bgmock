@@ -40,15 +40,15 @@ public class OutgoingTransaction {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private TransactionStatus status = TransactionStatus.PENDING; // PENDING, SUCCESS, FAILED
+    private TransactionStatus status; // PENDING, SUCCESS, FAILED
 
     @CreationTimestamp
     @Column(nullable = false)
-    private final LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(nullable = false)
-    private LocalDateTime updatedAt = this.createdAt;
+    private LocalDateTime updatedAt;
 
     public OutgoingTransaction(UUID fromAccountId, String fromClearingNumber, String fromAccountNumber,
                                String toBankgoodNumber, BigDecimal amount) {
@@ -58,5 +58,4 @@ public class OutgoingTransaction {
         this.toBankgoodNumber = toBankgoodNumber;
         this.amount = amount;
     }
-
 }
