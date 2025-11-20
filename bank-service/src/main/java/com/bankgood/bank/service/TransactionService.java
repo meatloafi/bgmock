@@ -30,26 +30,26 @@ public class TransactionService {
     @Value("${BANK_CLEARING_NUMBER}")
     private String fromClearingNumber;
 
+    private static final String TOPIC_INITIATED = "transactions.initiated";
+    private static final String TOPIC_PROCESSED = "transactions.processed";
+
     private final OutgoingTransactionRepository outgoingRepo;
     private final IncomingTransactionRepository incomingRepo;
     private final AccountRepository accountRepo;
 
-    private final KafkaTemplate<String, OutgoingTransactionEvent> outgoingTemplate;
-    private final KafkaTemplate<String, TransactionResponseEvent> responseTemplate;
+    private final KafkaTemplate<String, OutgoingTransactionEvent> initiatedTemplate;
+    private final KafkaTemplate<String, TransactionResponseEvent> processedTemplate;
 
     public TransactionService(OutgoingTransactionRepository outgoingRepo,
                               IncomingTransactionRepository incomingRepo,
                               AccountRepository accountRepo,
-                              KafkaTemplate<String, OutgoingTransactionEvent> outgoingTemplate,
-                              KafkaTemplate<String, TransactionResponseEvent> responseTemplate) {
+                              KafkaTemplate<String, OutgoingTransactionEvent> initiatedTemplate,
+                              KafkaTemplate<String, TransactionResponseEvent> processedTemplate) {
         this.outgoingRepo = outgoingRepo;
         this.incomingRepo = incomingRepo;
         this.accountRepo = accountRepo;
-        this.outgoingTemplate = outgoingTemplate;
-        this.responseTemplate = responseTemplate; }
-
-    private static final String TOPIC_INITIATED = "transactions.initiated";
-    private static final String TOPIC_PROCESSED = "transactions.processed";
+        this.initiatedTemplate = initiatedTemplate;
+        this.processedTemplate = processedTemplate; }
 
     // ===================== OUTGOING =====================
     @Transactional
@@ -191,7 +191,7 @@ public class TransactionService {
 
     public void sendOutgoingTransaction(OutgoingTransactionEvent event) {
         log.info("Producing OutgoingTransactionEvent → transactions.initiated");
-        outgoingTemplate.send(TOPIC_INITIATED, event);
+        initiatedTemplate.send(TOPIC_INITIATED, event);
     }
 
     // ===================== INCOMING: CONSUME forwarded =====================
@@ -213,8 +213,8 @@ public class TransactionService {
 
         TransactionResponseEvent response = new TransactionResponseEvent(
                 event.getTransactionId(),
-                success ? TransactionStatus.SUCCESS : TransactionStatus.FAILED,
-                success ? "Transaction processed" : "Insufficient funds"
+                success ? TransactionStatus.SUCCESS : TransactionStatus.FAILED, // Sätt rätt status
+                success ? "Transaction processed" : "Insufficient funds" // Sätt rätt message
         );
 
 
@@ -224,7 +224,7 @@ public class TransactionService {
 
     public void sendProcessedResponse(TransactionResponseEvent event) {
         log.info("Producing TransactionResponseEvent → transactions.processed");
-        responseTemplate.send(TOPIC_PROCESSED, event);
+        processedTemplate.send(TOPIC_PROCESSED, event);
     }
 
     // ===================== OUTGOING RESPONSE: CONSUME completed =====================

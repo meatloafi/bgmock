@@ -1,6 +1,5 @@
 package com.clearingservice.model;
 
-import com.bankgood.common.model.TransactionStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -11,34 +10,26 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "transactions")
+@Table(name = "incoming_transactions")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Getter
 @Setter
-public class Transaction {
+@Getter
+public class IncomingTransaction {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    private UUID id;
-
-    @Column(nullable = false, unique = true) // TODO, kolla om det räcker med endast en id.
-    private UUID transactionId; // samma som i TransactionDTO
+    @Column(unique = true, updatable = false, nullable = false)
+    private UUID transactionId;
 
     @Column(nullable = false)
-    private String fromAccountNumber;
-
-    @Column(nullable = false)
-    private String fromClearingNumber;
-
-    @Column(nullable = true)  // Can be null when recipient mapping not found
     private String toClearingNumber;
 
-    @Column(nullable = true)  // Can be null when recipient mapping not found
+    @Column(nullable = false)
     private String toAccountNumber;
 
-    @Column(nullable = false, precision = 15, scale = 2)
+    @Column(nullable = false)
     private BigDecimal amount;
 
     @Enumerated(EnumType.STRING)
@@ -46,11 +37,16 @@ public class Transaction {
     private TransactionStatus status; // PENDING, SUCCESS, FAILED
 
     @CreationTimestamp
+    @Column(nullable = false)
     private LocalDateTime createdAt;
 
     @UpdateTimestamp
+    @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    @Column(nullable = true)
-    private String message; 
+    public IncomingTransaction(String toClearingNumber, String toAccountNumber, BigDecimal amount) {
+        this.toClearingNumber = toClearingNumber;
+        this.toAccountNumber = toAccountNumber;
+        this.amount = amount;
+    }
 }

@@ -26,6 +26,10 @@ public class KafkaConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
+    @Value("${spring.kafka.consumer.group-id}")
+    private String groupId;
+
+
     // ===================== PRODUCER =====================
 
     private <T> ProducerFactory<String, T> producerFactory() {
@@ -58,7 +62,7 @@ public class KafkaConfig {
     private <T> ConsumerFactory<String, T> consumerFactory(Class<T> eventClass) {
         Map<String, Object> config = new HashMap<>();
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        config.put(ConsumerConfig.GROUP_ID_CONFIG, "bank-group");
+        config.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
 
         JsonDeserializer<T> jsonDeserializer = new JsonDeserializer<>(eventClass);

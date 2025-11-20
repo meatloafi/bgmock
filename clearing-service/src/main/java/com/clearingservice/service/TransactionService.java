@@ -1,169 +1,158 @@
 package com.clearingservice.service;
 
-import com.bankgood.common.event.TransactionEvent;
+import com.bankgood.common.event.IncomingTransactionEvent;
+import com.bankgood.common.event.OutgoingTransactionEvent;
 import com.bankgood.common.event.TransactionResponseEvent;
 import com.clearingservice.model.BankMapping;
-import com.clearingservice.model.Transaction;
+import com.clearingservice.model.OutgoingTransaction;
 import com.bankgood.common.model.TransactionStatus;
 import com.clearingservice.repository.BankMappingRepository;
-import com.clearingservice.repository.TransactionRepository;
-import lombok.RequiredArgsConstructor;
+import com.clearingservice.repository.IncomingTransactionRepository;
+import com.clearingservice.repository.OutgoingTransactionRepository;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Optional;
 
-/**
- * Service that handles the complete clearing logic:
- * 1. Receives TransactionEvent from Bank A
- * 2. Looks up bankgood number → clearing number + account number
- * 3. Saves the transaction as PENDING or FAILED
- * 4. Forwards to Bank B
- * 5. Receives TransactionResponseEvent from Bank B
- * 6. Updates the transaction and sends status back to Bank A
- */
-@Service
-@RequiredArgsConstructor
 @Slf4j
+@Service
 public class TransactionService {
 
-    private final TransactionRepository transactionRepository;
-    private final BankMappingRepository bankMappingRepository;
+    private static final String TOPIC_FORWARDED = "transactions.forwarded";
+    private static final String TOPIC_COMPLETED = "transactions.completed";
 
-    private final KafkaTemplate<String, TransactionEvent> transactionKafkaTemplate;
-    private final KafkaTemplate<String, TransactionResponseEvent> responseKafkaTemplate;
+    private final OutgoingTransactionRepository outgoingRepo;
+    private final IncomingTransactionRepository incomingRepo;
+    private final BankMappingRepository mappingRepo;
 
-    private static final String RESPONSE_TOPIC = "transactions.response";
+    private final KafkaTemplate<String, IncomingTransactionEvent> forwardedTemplate;
+    private final KafkaTemplate<String, TransactionResponseEvent> completedTemplate;
+
+    public TransactionService(
+            OutgoingTransactionRepository outgoingRepo,
+            IncomingTransactionRepository incomingRepo,
+            BankMappingRepository mappingRepo,
+            KafkaTemplate<String, IncomingTransactionEvent> forwardedTemplate,
+            KafkaTemplate<String, TransactionResponseEvent> completedTemplate
+    ) {
+        this.outgoingRepo = outgoingRepo;
+        this.incomingRepo = incomingRepo;
+        this.mappingRepo = mappingRepo;
+        this.forwardedTemplate = forwardedTemplate;
+        this.completedTemplate = completedTemplate;
+    }
 
     /**
-     * Handles incoming TransactionEvent from Bank A
+     * CONSUMER: transactions.initiated
+     * Bank A skickar TransactionOutgoingEvent → Clearing-service
      */
     @Transactional
-    public void processIncomingTransaction(TransactionEvent dto) {
-        log.info("📥 Received TransactionEvent from Bank A: {}", dto.getTransactionId());
+    public ResponseEntity<?> handleOutgoingTransaction(OutgoingTransactionEvent event) {
+        log.info("Clearing-service received OutgoingTransactionEvent for bankgiro {}", event.getToBankgoodNumber());
 
-        // Look up recipient via bankgood number
-        BankMapping mapping = bankMappingRepository.findByBankgoodNumber(dto.getToBankgoodNumber())
-                .orElse(null);
+        // 1. Spara outgoing transaction internt hos clearing
+        OutgoingTransaction outgoing = new OutgoingTransaction(
+                event.getTransactionId(),
+                event.getFromAccountId(),
+                event.getFromClearingNumber(),
+                event.getFromAccountNumber(),
+                event.getToBankgoodNumber(),
+                event.getAmount(),
+                event.getStatus(),
+                event.getCreatedAt(),
+                event.getUpdatedAt()
+        );
+        outgoingRepo.save(outgoing);
 
-        // Create transaction in DB
-        Transaction tx = new Transaction();
-        tx.setTransactionId(dto.getTransactionId());
-        tx.setFromAccountNumber(dto.getFromAccountNumber());
-        tx.setFromClearingNumber(dto.getFromClearingNumber());
-        tx.setAmount(dto.getAmount());
-        tx.setCreatedAt(LocalDateTime.now());
-        tx.setUpdatedAt(LocalDateTime.now());
+        // 2. Kontrollera bankgiro → clearing + account
+        Optional<BankMapping> mappingOpt = mappingRepo.findByBankgoodNumber(event.getToBankgoodNumber());
 
-        if (mapping == null) {
-            // Recipient not found → FAILED
-            log.warn("❌ Recipient not found for bankgood number {}", dto.getToBankgoodNumber());
-            tx.setStatus(TransactionStatus.FAILED);
-            tx.setMessage("Recipient not found");
-            transactionRepository.save(tx);
+        // TODO, fixa rätt bankmapping för lookup
+        /*
+        if (mappingOpt.isEmpty()) {
+            log.warn("No mapping found for bankgiro {}", event.getToBankgoodNumber());
 
-            // Send immediate failure response to Bank A
-            TransactionResponseEvent response = new TransactionResponseEvent(
-                    dto.getTransactionId(),
+            // Skicka FAILED response tillbaka till Bank A
+            TransactionResponseEvent failedResponse = new TransactionResponseEvent(
+                    event.getTransactionId(),
                     TransactionStatus.FAILED,
-                    "Recipient not found"
+                    "No bank mapping found for bankgiro"
             );
-            sendTransactionResponse(response);
-            return;
+
+            // Key = ursprungsbanken (frånClearingNumber)
+            completedTemplate.send(TOPIC_COMPLETED, event.getFromClearingNumber(), failedResponse);
+            ResponseEntity.badRequest().body("No bank mapping found for bankgiro");;
         }
 
-        // Recipient found → populate clearing number + account number
-        tx.setToClearingNumber(mapping.getClearingNumber());
-        tx.setToAccountNumber(mapping.getAccountNumber());
-        tx.setStatus(TransactionStatus.PENDING);
-        transactionRepository.save(tx);
+        BankMapping mapping = mappingOpt.get();
 
-        // Forward to Bank B
-        TransactionEvent forwardEvent = toEvent(tx);
-        forwardTransactionToBank(forwardEvent, mapping.getBankName());
+        // 3. Skapa IncomingTransactionEvent till mottagarbanken
+        IncomingTransactionEvent incomingEvent = new IncomingTransactionEvent(
+                event.getTransactionId(),
+                mapping.getClearingNumber(),
+                mapping.getAccountNumber(),
+                event.getAmount(),
+                TransactionStatus.PENDING,
+                event.getCreatedAt(),
+                LocalDateTime.now()
+        );
+
+        // 4. Skicka vidare → transactions.forwarded (med key = mottagarbankens clearingnummer)
+        forwardedTemplate.send(TOPIC_FORWARDED, mapping.getClearingNumber(), incomingEvent);
+
+        log.info("Forwarded incoming transaction to bank {} for account {}",
+                mapping.getClearingNumber(), mapping.getAccountNumber());
+
+         */ // TODO, ta bort allt som är kommenterat när bankMapping är klar.
+
+        forwardedTemplate.send(TOPIC_FORWARDED,
+                "00001",
+                new IncomingTransactionEvent(
+                        event.getTransactionId(),
+                        "00001",
+                        "1",
+                        event.getAmount(),
+                        TransactionStatus.PENDING,
+                        event.getCreatedAt(),
+                        LocalDateTime.now())); // TODO, ta bort denna detta när bankmapping är klart, det är hårdkodat.
+
+
+        return ResponseEntity.ok("Outgoing transaction processed and forwarded");
     }
 
-    /**
-     * Forwards TransactionEvent to recipient bank (Bank B)
-     */
-    public void forwardTransactionToBank(TransactionEvent event, String bankName) {
-        String bankTopic = "transactions.incoming." + bankName;
-
-        transactionKafkaTemplate.send(bankTopic, event)
-                .whenComplete((result, ex) -> {
-                    if (ex == null) {
-                        log.info("✅ TransactionEvent {} sent to Bank B topic: {}", event.getTransactionId(), bankTopic);
-                    } else {
-                        log.error("❌ Failed to send TransactionEvent {} to Bank B topic: {}", event.getTransactionId(), bankTopic, ex);
-
-                        // Mark transaction as FAILED
-                        transactionRepository.findByTransactionId(event.getTransactionId()).ifPresent(tx -> {
-                            tx.setStatus(TransactionStatus.FAILED);
-                            tx.setMessage("Failed to forward transaction");
-                            tx.setUpdatedAt(LocalDateTime.now());
-                            transactionRepository.save(tx);
-
-                            // Send failure response to Bank A
-                            TransactionResponseEvent failResponse = new TransactionResponseEvent(
-                                    tx.getTransactionId(),
-                                    TransactionStatus.FAILED,
-                                    "Failed to forward transaction"
-                            );
-                            sendTransactionResponse(failResponse);
-                        });
-                    }
-                });
-    }
 
     /**
-     * Handles response from Bank B (SUCCESS / FAILED)
+     * CONSUMER: transactions.processed
+     * Bank B skickar response → Clearing-service
      */
     @Transactional
-    public void handleBankResponse(TransactionResponseEvent response) {
-        Transaction tx = transactionRepository.findByTransactionId(response.getTransactionId())
-                .orElseThrow(() -> new RuntimeException("Transaction not found: " + response.getTransactionId()));
+    public ResponseEntity<?> handleProcessedTransaction(TransactionResponseEvent event) {
 
-        // Update status in DB
-        tx.setStatus(response.getStatus());
-        tx.setMessage(response.getMessage());
-        tx.setUpdatedAt(LocalDateTime.now());
-        transactionRepository.save(tx);
+        log.info("Clearing-service received TransactionResponseEvent for {}", event.getTransactionId());
 
-        log.info("📩 Transaction {} updated with status: {}", tx.getTransactionId(), tx.getStatus());
+        // 1. Uppdatera incoming-transaction internt
+        incomingRepo.findByTransactionId(event.getTransactionId()).ifPresent(incoming -> {
+            incoming.setStatus(event.getStatus());
+            incomingRepo.save(incoming);
+        });
 
-        // Send status back to Bank A
-        sendTransactionResponse(response);
-    }
+        // 2. Hämta outgoing transaktionen för att veta vilken bank som ska få svaret
+        outgoingRepo.findByTransactionId(event.getTransactionId()).ifPresent(outgoing -> {
 
-    /**
-     * Sends TransactionResponseEvent to Bank A
-     */
-    public void sendTransactionResponse(TransactionResponseEvent response) {
-        responseKafkaTemplate.send(RESPONSE_TOPIC, response)
-                .whenComplete((result, ex) -> {
-                    if (ex == null) log.info("✅ TransactionResponseEvent sent to Bank A: {}", response);
-                    else log.error("❌ Failed to send TransactionResponseEvent: {}", response, ex);
-                });
-    }
+            // Skicka tillbaka → transactions.completed (med key = avsändarbankens clearingnummer)
+            completedTemplate.send(
+                    TOPIC_COMPLETED,
+                    outgoing.getFromClearingNumber(),
+                    event
+            );
 
-    /**
-     * Converts Transaction → TransactionEvent for forwarding
-     */
-    private TransactionEvent toEvent(Transaction tx) {
-        return new TransactionEvent(
-                tx.getTransactionId(),
-                null, // fromAccountId not used in clearing
-                tx.getFromClearingNumber(),
-                tx.getFromAccountNumber(),
-                null, // toBankgoodNumber is not available in clearing-service's Transaction model
-                tx.getToClearingNumber(),
-                tx.getToAccountNumber(),
-                tx.getAmount(),
-                tx.getStatus(),
-                tx.getCreatedAt(),
-                tx.getUpdatedAt()
-        );
+            log.info("Forwarded final response back to bank {}", outgoing.getFromClearingNumber());
+        });
+
+        return ResponseEntity.ok("Processed transaction response forwarded successfully");
     }
 }

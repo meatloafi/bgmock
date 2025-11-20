@@ -37,15 +37,15 @@ public class IncomingTransaction {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private TransactionStatus status = TransactionStatus.PENDING; // PENDING, SUCCESS, FAILED
+    private TransactionStatus status; // PENDING, SUCCESS, FAILED
 
     @CreationTimestamp
     @Column(nullable = false)
-    private final LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(nullable = false)
-    private LocalDateTime updatedAt = this.createdAt;
+    private LocalDateTime updatedAt;
 
     public IncomingTransaction(String toClearingNumber, String toAccountNumber, BigDecimal amount) {
         this.toClearingNumber = toClearingNumber;
