@@ -87,13 +87,25 @@ class BankServiceClient:
     
     # Transaction Management
     def create_transaction(self, transaction: TransactionEvent) -> Optional[TransactionEvent]:
-        """Create a new transaction"""
+        """Create a new transaction via REST API"""
         try:
+            # Convert transaction to JSON dict and send as application/json
+            payload = {
+                "transactionId": transaction.transaction_id,
+                "fromAccountId": transaction.from_account_id,
+                "fromClearingNumber": transaction.from_clearing_number,
+                "fromAccountNumber": transaction.from_account_number,
+                "toBankgoodNumber": transaction.to_bankgood_number,
+                "amount": float(transaction.amount),
+                "status": transaction.status.value
+            }
+
             response = self.session.post(
                 f"{self.base_url}/api/transactions",
-                data=transaction.to_json()
+                json=payload
             )
             response.raise_for_status()
+            logger.info(f"Successfully created transaction {transaction.transaction_id}")
             return TransactionEvent.from_json(response.json())
         except Exception as e:
             logger.error(f"Failed to create transaction: {e}")

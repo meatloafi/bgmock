@@ -38,16 +38,16 @@ class Config:
 
         self.clearing_service_url = os.getenv("CLEARING_SERVICE_URL", "http://localhost:30083")
 
-        # Kafka Topics
+        # Kafka Topics - actual implementation uses these 4 topics for transaction flow:
+        # transactions.initiated → Bank A sends to Clearing
+        # transactions.forwarded → Clearing forwards to Bank B
+        # transactions.processed → Bank B responds to Clearing
+        # transactions.completed → Clearing responds to Bank A
         self.topics = {
-            "payment_requests": "payment.requests",
-            "payment_prepare": "payment.prepare",
-            "payment_commit": "payment.commit",
-            "payment_rollback": "payment.rollback",
-            "transactions_outgoing": "transactions.outgoing",
-            "transactions_response": "transactions.response",
-            "transactions_incoming_a": "transactions.incoming.bank-a",
-            "transactions_incoming_b": "transactions.incoming.bank-b"
+            "transactions_initiated": "transactions.initiated",      # Bank A → Clearing
+            "transactions_forwarded": "transactions.forwarded",      # Clearing → Bank B
+            "transactions_processed": "transactions.processed",      # Bank B → Clearing
+            "transactions_completed": "transactions.completed"       # Clearing → Bank A
         }
 
         # Database connections (for direct state verification)

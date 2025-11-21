@@ -43,66 +43,69 @@ class TransactionSimulator:
         self._start_health_monitoring()
     
     def _setup_kafka_subscriptions(self):
-        """Setup Kafka topic subscriptions"""
+        """Setup Kafka topic subscriptions to monitor transaction flow"""
         topics_callbacks = {
-            config.topics["transactions_outgoing"]: self._on_transaction_outgoing,
-            config.topics["transactions_response"]: self._on_transaction_response,
-            config.topics["payment_requests"]: self._on_payment_request,
-            config.topics["payment_prepare"]: self._on_payment_prepare,
+            # All 4 topics used in the transaction flow
+            config.topics["transactions_initiated"]: self._on_transaction_initiated,
+            config.topics["transactions_forwarded"]: self._on_transaction_forwarded,
+            config.topics["transactions_processed"]: self._on_transaction_processed,
+            config.topics["transactions_completed"]: self._on_transaction_completed,
         }
-        
+
         for topic, callback in topics_callbacks.items():
             self.kafka_client.subscribe(topic, callback)
+            logger.info(f"Subscribed to Kafka topic: {topic}")
     
-    def _on_transaction_outgoing(self, key: str, value: dict):
-        """Handle outgoing transaction event"""
-        logger.info(f"Received outgoing transaction: {key}")
+    def _on_transaction_initiated(self, key: str, value: dict):
+        """Handle transaction initiated event from Bank A → Clearing"""
+        transaction_id = value.get("transactionId")
+        logger.info(f"[INITIATED] Transaction {transaction_id} sent from Bank A to Clearing")
         self.state_manager.add_kafka_event(
-            topic="transactions.outgoing",
+            topic="transactions.initiated",
             event_type="receive",
             data=value
         )
-        
-        # Update transaction state
-        if key:
-            self.state_manager.update_transaction_status(
-                key, 
-                TransactionStatus.PENDING,
-                "Sent to clearing service"
-            )
-    
-    def _on_transaction_response(self, key: str, value: dict):
-        """Handle transaction response event"""
-        logger.info(f"Received transaction response: {key}")
+
+    def _on_transaction_forwarded(self, key: str, value: dict):
+        """Handle transaction forwarded event from Clearing → Bank B"""
+        transaction_id = value.get("transactionId")
+        logger.info(f"[FORWARDED] Transaction {transaction_id} forwarded from Clearing to Bank B")
         self.state_manager.add_kafka_event(
-            topic="transactions.response",
+            topic="transactions.forwarded",
             event_type="receive",
             data=value
         )
-        
-        # Update transaction state
-        if key:
-            status = TransactionStatus(value.get("status", "FAILED"))
-            message = value.get("message", "")
-            self.state_manager.update_transaction_status(key, status, message)
-    
-    def _on_payment_request(self, key: str, value: dict):
-        """Handle payment request event"""
-        logger.info(f"Received payment request: {key}")
+
+    def _on_transaction_processed(self, key: str, value: dict):
+        """Handle transaction processed event from Bank B → Clearing"""
+        transaction_id = value.get("transactionId")
+        status = value.get("status", "UNKNOWN")
+        logger.info(f"[PROCESSED] Transaction {transaction_id} processed by Bank B with status {status}")
         self.state_manager.add_kafka_event(
-            topic="payment.requests",
+            topic="transactions.processed",
             event_type="receive",
             data=value
         )
-    
-    def _on_payment_prepare(self, key: str, value: dict):
-        """Handle payment prepare event"""
-        logger.info(f"Received payment prepare: {key}")
+
+    def _on_transaction_completed(self, key: str, value: dict):
+        """Handle transaction completed event from Clearing → Bank A"""
+        transaction_id = value.get("transactionId")
+        status = value.get("status", "UNKNOWN")
+        logger.info(f"[COMPLETED] Transaction {transaction_id} completed with status {status}")
         self.state_manager.add_kafka_event(
-            topic="payment.prepare",
+            topic="transactions.completed",
             event_type="receive",
             data=value
         )
+
+        # Update transaction state with final status
+        if transaction_id:
+            try:
+                final_status = TransactionStatus(status)
+                message = value.get("message", "Transaction completed")
+                self.state_manager.update_transaction_status(transaction_id, final_status, message)
+            except ValueError:
+                logger.warning(f"Unknown transaction status: {status}")
     
     def _initialize_test_accounts(self):
         """Create test accounts if they don't exist"""
@@ -173,8 +176,8 @@ class TransactionSimulator:
         amount: Decimal,
         use_rest: bool = True
     ) -> Optional[TransactionEvent]:
-        """Create a new transaction"""
-        
+        """Create a new transaction and send it to the system"""
+
         transaction = TransactionEvent(
             transaction_id=str(uuid.uuid4()),
             from_clearing_number=config.bank_a.clearing_number,
@@ -183,42 +186,47 @@ class TransactionSimulator:
             amount=amount,
             status=TransactionStatus.PENDING
         )
-        
-        # Add to state
+
+        # Add to simulator state tracking
         self.state_manager.add_transaction(transaction)
-        
+
         if use_rest:
-            # Use REST API
+            # Send via REST API (preferred method)
             start = time.time()
             result = self.bank_a_client.create_transaction(transaction)
             elapsed = time.time() - start
-            
+
             self.state_manager.add_rest_call(
                 method="POST",
                 endpoint="/api/transactions",
                 status_code=200 if result else 500,
                 response_time=elapsed
             )
-            
+
             if result:
-                logger.info(f"Transaction created via REST: {transaction.transaction_id}")
+                logger.info(f"✓ Transaction created via REST: {transaction.transaction_id}")
                 return result
+            else:
+                logger.warning(f"✗ Failed to create transaction via REST: {transaction.transaction_id}")
         else:
-            # Use Kafka directly
-            self.kafka_client.send_transaction_event(
-                config.topics["transactions_outgoing"],
-                transaction
-            )
-            
-            self.state_manager.add_kafka_event(
-                topic="transactions.outgoing",
-                event_type="send",
-                data=transaction.__dict__
-            )
-            
-            logger.info(f"Transaction sent via Kafka: {transaction.transaction_id}")
-            return transaction
-        
+            # Send via Kafka directly (fallback method)
+            if self.kafka_client.kafka_available:
+                self.kafka_client.send_transaction_event(
+                    config.topics["transactions_initiated"],
+                    transaction
+                )
+
+                self.state_manager.add_kafka_event(
+                    topic="transactions.initiated",
+                    event_type="send",
+                    data=transaction.__dict__
+                )
+
+                logger.info(f"✓ Transaction sent via Kafka: {transaction.transaction_id}")
+                return transaction
+            else:
+                logger.warning(f"✗ Kafka not available, cannot send transaction: {transaction.transaction_id}")
+
         return None
     
     def simulate_random_transaction(self) -> Optional[TransactionEvent]:

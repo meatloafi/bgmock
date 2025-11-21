@@ -1,252 +1,235 @@
-# BGMock - Banking & Clearing System
+# BGMock - Banking Microservices System
 
-A microservices-based banking and clearing system implementation using Spring Boot, Kafka, and PostgreSQL, deployable on Kubernetes.
+A multi-service banking system demonstrating real-time transaction processing across two banks via an asynchronous Kafka-based clearing service, running on Kubernetes.
 
-## Architecture Overview
+## Quick Start
 
-The system consists of:
-- **Bank Services**: Multiple bank instances (Bank A, Bank B) handling customer transactions
-- **Clearing Service**: Central clearing house for inter-bank transaction processing
-- **Common Module**: Shared entities, events, and test utilities
-- **Kafka**: Message broker for asynchronous communication
-- **PostgreSQL**: Persistent storage for each service
+Deploy to Kubernetes in 3-5 minutes:
+
+```bash
+# 1. Start Minikube
+minikube start --cpus=4 --memory=8192 --driver=docker
+eval $(minikube docker-env)
+
+# 2. Deploy everything
+chmod +x k8s/deploy-all.sh
+./k8s/deploy-all.sh bank-services kafka true
+
+# 3. Run the simulator
+cd bgmock-simulator
+pip install -r requirements.txt
+streamlit run src/ui/streamlit_app.py
+```
+
+Open http://localhost:8501, create transactions, and watch them flow through the system.
+
+**See DEMO.md for complete 3-hour demonstration guide.**
+
+---
+
+## How It Works (Brief)
+
+```
+Bank A (debit) → Clearing (route) → Bank B (credit) → Clearing (response) → Bank A (update)
+    ↓                ↓                  ↓                   ↓                    ↓
+transactions.   transactions.       transactions.      transactions.         Status
+initiated       forwarded           processed          completed             updated
+```
+
+Transactions flow through 4 Kafka topics with guaranteed ordering per bank. Full visibility in the Streamlit dashboard.
+
+---
 
 ## Project Structure
 
 ```
 bgmock/
-├── bank-service/          # Bank microservice
-├── clearing-service/      # Clearing house service
-├── common/                # Shared code and test utilities
-├── k8s/                   # Kubernetes deployment manifests
-│   ├── bank-service/      # Bank deployments (bank-a, bank-b)
-│   ├── clearing-service/  # Clearing service deployment
-│   ├── kafka/             # Kafka cluster configuration
-│   ├── postgres/          # PostgreSQL StatefulSets
-│   └── commands.md        # Kubectl quick reference
-├── TESTING.md             # Comprehensive testing guide
-└── pom.xml                # Maven parent POM
+├── bank-service/              # Spring Boot service for Bank A/B
+├── clearing-service/          # Spring Boot clearing service
+├── common/                    # Shared Java event models
+├── bgmock-simulator/          # Python Streamlit dashboard
+├── k8s/                       # Kubernetes manifests
+│   ├── kafka/                 # Kafka cluster (Strimzi)
+│   ├── bank-service/          # Bank deployments
+│   ├── clearing-service/      # Clearing deployment
+│   ├── postgres/              # Database StatefulSets
+│   └── deploy-all.sh          # One-command deployment
+├── TESTING.md                 # Testing guide
+├── DEMO.md                    # 3-hour demo guide
+└── pom.xml                    # Maven parent
 ```
-
-## Prerequisites
-
-- **Java 17** or higher
-- **Maven 3.8+**
-- **Docker Desktop** (for local development)
-- **Minikube** or Kubernetes cluster (for deployment)
-- **kubectl** (for K8s management)
-
-## Quick Start
-
-### 1. Build the Project
-
-```bash
-mvn clean install
-```
-
-### 2. Run Tests
-
-```bash
-mvn test
-```
-
-### 3. Build Docker Images
-
-```bash
-docker build -f bank-service/Dockerfile -t bank-service:latest .
-docker build -f clearing-service/Dockerfile -t clearing-service:latest .
-```
-
-### 4. Deploy to Kubernetes
-
-```bash
-# Start Minikube
-minikube start
-
-# Configure Docker to use Minikube's daemon
-eval $(minikube docker-env)
-
-# Deploy infrastructure
-kubectl apply -f k8s/kafka/
-kubectl apply -f k8s/postgres/
-
-
-# Note: Wait until all pods show READY=1/1 (or appropriate replica count) before deploying services.
-kubectl get pods -w
-kubectl get pods -n kafka -w
-
-# Deploy services
-kubectl apply -f k8s/bank-service/
-kubectl apply -f k8s/clearing-service/
-
-# Check deployment status
-kubectl get pods
-kubectl get services
-```
-
-### 5. Access Services
-
-```bash
-# Get Minikube IP
-minikube ip
-
-# Access Bank A (NodePort 30081)
-curl http://$(minikube ip):30081/health
-
-# Access Bank B (NodePort 30082)
-curl http://$(minikube ip):30082/health
-
-# Or use Minikube service URLs
-minikube service bankgood-bank-a-service --url
-```
-
-## Development
-
-### Local Testing
-
-The project uses embedded Kafka and H2 database for integration tests, allowing you to test without external dependencies:
-
-```bash
-# Run all tests
-mvn test
-
-# Run specific test class
-mvn test -Dtest=KafkaIntegrationTest
-
-# Run specific test method
-mvn test -Dtest=KafkaIntegrationTest#testProducer_sendsTransactionEventCorrectly
-```
-
-See [TESTING.md](TESTING.md) for comprehensive testing documentation.
-
-### Maven Modules
-
-The project is organized as a multi-module Maven project:
-
-- **Parent POM**: Manages dependency versions and plugin configurations
-- **Common**: Shared models, events, and test utilities
-- **Bank Service**: Bank microservice implementation
-- **Clearing Service**: Clearing house implementation
-
-Dependencies are centrally managed in the parent POM for consistency.
-
-## Kafka Topics
-
-The system uses the following Kafka topics for communication:
-
-| Topic | Producer | Consumer | Purpose |
-|-------|----------|----------|---------|
-| `payment.requests` | Bank Services | - | Payment initiation |
-| `payment.prepare` | - | Bank Services | Payment preparation |
-| `transactions.outgoing` | Bank Services | Clearing Service | Outgoing transactions |
-| `transactions.response` | Clearing Service | Bank Services | Transaction responses |
-| `transactions.incoming.<bank>` | Clearing Service | Bank Services | Bank-specific incoming transactions |
-
-## Configuration
-
-### Application Properties
-
-Each service has its own `application.properties`:
-- `bank-service/src/main/resources/application.properties`
-- `clearing-service/src/main/resources/application.properties`
-
-### Environment Variables
-
-Key environment variables (set in K8s deployments):
-
-```bash
-# Database
-SPRING_DATASOURCE_URL=jdbc:postgresql://host:5432/dbname
-SPRING_DATASOURCE_USERNAME=username
-SPRING_DATASOURCE_PASSWORD=password
-
-# Kafka
-SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
-
-# Bank-specific
-BANK_CLEARING_NUMBER=000001
-```
-
-## Kubernetes Deployment
-
-All Kubernetes manifests are in the `/k8s` directory:
-
-- **Kafka Cluster**: Strimzi-based KRaft mode (Zookeeper-less)
-- **PostgreSQL**: StatefulSets with persistent volumes
-- **Services**: Deployments with 2 replicas each
-- **NodePorts**: External access to services
-
-See [k8s/commands.md](k8s/commands.md) for kubectl quick reference.
-
-## Technology Stack
-
-- **Framework**: Spring Boot 3.2.0
-- **Java**: 17
-- **Build Tool**: Maven
-- **Message Broker**: Apache Kafka
-- **Database**: PostgreSQL (production), H2 (testing)
-- **Container**: Docker
-- **Orchestration**: Kubernetes (Minikube)
-- **Testing**: JUnit 5, Spring Kafka Test, Embedded Kafka
-
-## Common Operations
-
-### View Logs
-
-```bash
-# List pods
-kubectl get pods
-
-# View logs
-kubectl logs <pod-name>
-
-# Follow logs in real-time
-kubectl logs -f <pod-name>
-```
-
-### Restart Service
-
-```bash
-kubectl rollout restart deployment/bankgood-bank-a
-```
-
-### Scale Service
-
-```bash
-kubectl scale deployment/bankgood-bank-a --replicas=3
-```
-
-### Database Access
-
-```bash
-# Connect to PostgreSQL pod
-kubectl exec -it <postgres-pod-name> -- psql -U username -d dbname
-
-# List tables
-\dt
-
-# Exit
-\q
-```
-
-## Documentation
-
-- [TESTING.md](TESTING.md) - Comprehensive testing guide
-- [k8s/commands.md](k8s/commands.md) - Kubernetes command reference
-- [bank-service/system_overview.md](bank-service/system_overview.md) - Architecture deep dive (Swedish)
-
-## Contributing
-
-1. Make changes in a feature branch
-2. Ensure all tests pass: `mvn test`
-3. Build successfully: `mvn clean install`
-4. Update documentation as needed
-
-## License
-
-Internal project for educational purposes.
 
 ---
 
-**Last Updated**: 2025-11-17
+## Architecture
+
+### Kubernetes Components
+
+**kafka namespace:**
+- Kafka cluster (1 broker, KRaft mode)
+- Strimzi operator
+
+**bank-services namespace:**
+- Bank A service (2 replicas)
+- Bank B service (2 replicas)
+- Clearing service (2 replicas)
+- PostgreSQL Bank A (StatefulSet)
+- PostgreSQL Bank B (StatefulSet)
+- PostgreSQL Clearing (StatefulSet)
+
+### Services
+
+| Service | Port | Address |
+|---------|------|---------|
+| Bank A | 30081 | http://192.168.49.2:30081 |
+| Bank B | 30082 | http://192.168.49.2:30082 |
+| Clearing | 30083 | http://192.168.49.2:30083 |
+| Kafka | 9092 | bgmock-kafka-kafka-plain-bootstrap.kafka.svc.cluster.local |
+
+### Kafka Topics
+
+| Topic | Direction | Purpose |
+|-------|-----------|---------|
+| transactions.initiated | Bank A → Clearing | Outgoing transaction |
+| transactions.forwarded | Clearing → Bank B | Forward to recipient |
+| transactions.processed | Bank B → Clearing | Process response |
+| transactions.completed | Clearing → Bank A | Final completion |
+
+---
+
+## Recent Fixes (MVP Complete)
+
+1. **Bank Mapping** - Fixed hardcoded routing, now dynamic lookup
+2. **Balance Validation** - Implemented proper debit/credit logic
+3. **Simulator REST** - Now actually sends transactions to Bank A
+4. **Kafka Topics** - Simulator now monitors correct 4-topic pipeline
+
+See `DEMO.md` for detailed explanation of what was fixed and why.
+
+---
+
+## Manual Setup (if needed)
+
+### Prerequisites
+
+- Kubernetes cluster (Minikube recommended)
+- kubectl, Helm 3.x
+- Java 17, Maven 3.8+
+- Docker
+
+### Step-by-Step
+
+```bash
+# 1. Build images
+cd bank-service && mvn package -DskipTests && docker build -t bank-service:latest .
+cd ../clearing-service && mvn package -DskipTests && docker build -t clearing-service:latest .
+
+# 2. Create namespaces
+kubectl create namespace kafka
+kubectl create namespace bank-services
+
+# 3. Install Strimzi Kafka operator
+helm repo add strimzi https://strimzi.io/charts && helm repo update
+helm install strimzi-operator strimzi/strimzi-kafka-operator -n kafka
+
+# 4. Deploy infrastructure
+kubectl apply -f k8s/kafka/ -n kafka
+kubectl apply -f k8s/postgres/ -n bank-services
+
+# 5. Deploy services
+kubectl apply -f k8s/bank-service/ -n bank-services
+kubectl apply -f k8s/clearing-service/ -n bank-services
+
+# 6. Verify
+kubectl get pods -n bank-services
+kubectl get pods -n kafka
+```
+
+---
+
+## Common Commands
+
+```bash
+# View pods
+kubectl get pods -n bank-services
+
+# View logs
+kubectl logs <pod-name> -n bank-services
+
+# Connect to database
+kubectl exec -it postgres-bank-a-0 -n bank-services -- \
+  psql -U bank_a_user -d bank_a_db
+
+# Scale service
+kubectl scale deployment/bankgood-bank-a --replicas=5 -n bank-services
+
+# View Kafka topics
+kubectl exec -it bgmock-kafka-kafka-0 -n kafka -- \
+  /opt/kafka/bin/kafka-topics.sh --list --bootstrap-server localhost:9092
+```
+
+---
+
+## Troubleshooting
+
+### Pods not starting?
+```bash
+kubectl describe pod <pod-name> -n bank-services
+kubectl logs <pod-name> -n bank-services
+```
+
+### Services not responding?
+```bash
+# Test connectivity
+curl http://192.168.49.2:30081/health
+
+# Or from inside cluster
+kubectl run -it --rm test --image=alpine --restart=Never -n bank-services -- \
+  wget -O- http://bankgood-bank-a-service:8080/health
+```
+
+### Kafka not ready?
+```bash
+kubectl get kafka -n kafka
+kubectl logs -l strimzi.io/cluster=bgmock-kafka -n kafka
+```
+
+---
+
+## Technology Stack
+
+- Spring Boot 3.2, Java 17
+- Apache Kafka 4.0, Strimzi operator
+- PostgreSQL 15
+- Kubernetes, Docker
+- Python 3.9+, Streamlit
+
+---
+
+## For Demonstrations
+
+**See `DEMO.md` for:**
+- Complete 3-hour demo guide
+- Example transactions
+- Failure scenarios
+- Verification checklist
+- Live monitoring walkthrough
+
+---
+
+## Testing
+
+```bash
+# Run tests
+mvn test
+
+# Run specific test
+mvn test -Dtest=KafkaIntegrationTest
+```
+
+See `TESTING.md` for comprehensive testing documentation.
+
+---
+
+**Status:** MVP complete, ready for demonstration on Kubernetes ✅
 

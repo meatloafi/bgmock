@@ -55,6 +55,28 @@ public class TransactionService {
     @Transactional
     public ResponseEntity<?> createOutgoingTransaction(OutgoingTransactionEvent event) {
         try {
+            // 1. Find sender account
+            var senderOpt = accountRepo.findById(event.getFromAccountId());
+            if (senderOpt.isEmpty()) {
+                log.warn("Sender account {} not found", event.getFromAccountId());
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Sender account not found");
+            }
+
+            Account senderAccount = senderOpt.get();
+
+            // 2. Check if sender has sufficient balance
+            if (senderAccount.getBalance().compareTo(event.getAmount()) < 0) {
+                log.warn("Insufficient balance for account {}. Balance: {}, Required: {}",
+                        event.getFromAccountId(), senderAccount.getBalance(), event.getAmount());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Insufficient balance");
+            }
+
+            // 3. Debit the sender's account
+            senderAccount.setBalance(senderAccount.getBalance().subtract(event.getAmount()));
+            accountRepo.save(senderAccount);
+            log.info("Account {} debited with amount {}", event.getFromAccountId(), event.getAmount());
+
+            // 4. Create and save outgoing transaction
             OutgoingTransaction transaction = new OutgoingTransaction(
                     event.getFromAccountId(),
                     event.getFromClearingNumber(),
@@ -64,7 +86,9 @@ public class TransactionService {
             );
             transaction.setStatus(event.getStatus());
             OutgoingTransaction saved = outgoingRepo.save(transaction);
-            sendOutgoingTransaction(event); // PRODUCE till Kafka
+
+            // 5. Send to Kafka
+            sendOutgoingTransaction(event);
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
         } catch (Exception e) {
             log.error("Failed to create outgoing transaction", e);
@@ -200,25 +224,45 @@ public class TransactionService {
     public void handleIncomingTransaction(IncomingTransactionEvent event) {
         log.info("Received IncomingTransactionEvent for account {}", event.getToAccountNumber());
 
-        // 1. Spara incoming transaktionen
+        // 1. Save incoming transaction
         IncomingTransaction transaction = new IncomingTransaction(
                 event.getToClearingNumber(),
                 event.getToAccountNumber(),
                 event.getAmount()
         );
-        incomingRepo.save(transaction);
+        IncomingTransaction savedTx = incomingRepo.save(transaction);
 
-        // 2. Kontrollera om transaktionen kan genomföras
-        boolean success = true; // TODO: saldo-kontroll
+        // 2. Find the recipient account
+        var accountOpt = accountRepo.findAll().stream()
+                .filter(acc -> acc.getAccountNumber().equals(event.getToAccountNumber()))
+                .findFirst();
 
+        boolean success = false;
+        String message = "Account not found";
+
+        if (accountOpt.isPresent()) {
+            Account account = accountOpt.get();
+
+            // 3. Check if balance is sufficient (for incoming transaction, we credit the account)
+            // For incoming, we simply credit the amount - no need to check balance
+            account.setBalance(account.getBalance().add(event.getAmount()));
+            accountRepo.save(account);
+
+            success = true;
+            message = "Transaction processed and credited to account";
+
+            log.info("Account {} credited with amount {}", event.getToAccountNumber(), event.getAmount());
+        } else {
+            log.warn("Account {} not found for incoming transaction", event.getToAccountNumber());
+        }
+
+        // 4. Send response back to clearing → transactions.processed
         TransactionResponseEvent response = new TransactionResponseEvent(
                 event.getTransactionId(),
-                success ? TransactionStatus.SUCCESS : TransactionStatus.FAILED, // Sätt rätt status
-                success ? "Transaction processed" : "Insufficient funds" // Sätt rätt message
+                success ? TransactionStatus.SUCCESS : TransactionStatus.FAILED,
+                message
         );
 
-
-        // 3. Skicka response tillbaka till clearing → transactions.processed
         sendProcessedResponse(response);
     }
 
