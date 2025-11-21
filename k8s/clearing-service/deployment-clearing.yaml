@@ -1,0 +1,102 @@
+# k8s/clearing-service/deployment-clearing.yaml
+# Clearing service deployment
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bankgood-clearing
+  labels:
+    app: bankgood-clearing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bankgood-clearing
+  template:
+    metadata:
+      labels:
+        app: bankgood-clearing
+    spec:
+      containers:
+        - name: clearing
+          image: clearing-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+              name: http
+          env: 
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres-service-clearing:5432/clearing_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config-clearing
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret-clearing
+                  key: POSTGRES_PASSWORD
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "update"
+            - name: SPRING_APPLICATION_NAME
+              value: "clearing-service"
+
+            # Kafka config
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "bgmock-kafka-kafka-plain-bootstrap.kafka.svc.cluster.local:9092"
+            - name: SPRING_KAFKA_CONSUMER_GROUP_ID
+              value: "clearing-service-group"
+            - name: SPRING_KAFKA_PRODUCER_KEY_SERIALIZER
+              value: "org.apache.kafka.common.serialization.StringSerializer"
+            - name: SPRING_KAFKA_PRODUCER_VALUE_SERIALIZER
+              value: "org.apache.kafka.common.serialization.StringSerializer"
+            - name: SPRING_KAFKA_CONSUMER_KEY_DESERIALIZER
+              value: "org.apache.kafka.common.serialization.StringDeserializer"
+            - name: SPRING_KAFKA_CONSUMER_VALUE_DESERIALIZER
+              value: "org.apache.kafka.common.serialization.StringDeserializer"
+
+
+          livenessProbe:
+            httpGet:
+              path: /clearing/health
+              port: 8080
+            initialDelaySeconds: 50
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /clearing/health
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            timeoutSeconds: 10
+            failureThreshold: 3
+          
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bankgood-clearing-service
+  labels:
+    app: bankgood-clearing
+spec:
+  type: ClusterIP
+  selector:
+    app: bankgood-clearing
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+      name: http
