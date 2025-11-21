@@ -62,8 +62,14 @@ public class TransactionService {
                     event.getToBankgoodNumber(),
                     event.getAmount()
             );
-            transaction.setStatus(event.getStatus());
+
             OutgoingTransaction saved = outgoingRepo.save(transaction);
+
+            event.setTransactionId(saved.getTransactionId());
+            event.setStatus(saved.getStatus());
+            event.setCreatedAt(saved.getCreatedAt());
+            event.setUpdatedAt(saved.getUpdatedAt());
+
             sendOutgoingTransaction(event); // PRODUCE till Kafka
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
         } catch (Exception e) {

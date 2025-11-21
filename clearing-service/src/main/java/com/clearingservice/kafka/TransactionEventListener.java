@@ -20,13 +20,21 @@ public class TransactionEventListener {
     }
 
     // Konsumerar outgoing-transaktioner initierade av bank-service
-    @KafkaListener(topics = "transactions.initiated", groupId = "#{__listener.groupId}")
+    @KafkaListener(
+            topics = "transactions.initiated",
+            groupId = "clearing-service-initiated",
+            containerFactory = "outgoingListenerFactory"
+    )
     public void listenOutgoing(OutgoingTransactionEvent event) {
         transactionService.handleOutgoingTransaction(event);
     }
 
     // Konsumerar processed-transaktioner från bank-service (response)
-    @KafkaListener(topics = "transactions.processed", groupId = "#{__listener.groupId}")
+    @KafkaListener(
+            topics = "transactions.processed",
+            groupId = "clearing-service-processed",
+            containerFactory = "responseListenerFactory"
+    )
     public void listenProcessed(TransactionResponseEvent event) {
         transactionService.handleProcessedTransaction(event);
     }

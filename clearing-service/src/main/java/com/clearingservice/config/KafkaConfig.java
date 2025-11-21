@@ -39,11 +39,6 @@ public class KafkaConfig {
     }
 
     @Bean
-    public KafkaTemplate<String, OutgoingTransactionEvent> outgoingTemplate() {
-        return new KafkaTemplate<>(producerFactory());
-    }
-
-    @Bean
     public KafkaTemplate<String, IncomingTransactionEvent> incomingTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
@@ -54,7 +49,7 @@ public class KafkaConfig {
     }
 
     // ===================== CONSUMER =====================
-    private <T> ConsumerFactory<String, T> consumerFactory(Class<T> eventClass, String groupId) {
+    private <T> ConsumerFactory<String, T> consumerFactory(Class<T> eventClass) {
         Map<String, Object> config = new HashMap<>();
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
         config.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
@@ -62,6 +57,8 @@ public class KafkaConfig {
 
         JsonDeserializer<T> jsonDeserializer = new JsonDeserializer<>(eventClass);
         jsonDeserializer.addTrustedPackages("*");
+        jsonDeserializer.ignoreTypeHeaders(); // kan hjälpa med __TypeId__ problem
+        jsonDeserializer.setRemoveTypeHeaders(false);
 
         return new DefaultKafkaConsumerFactory<>(
                 config,
@@ -71,10 +68,18 @@ public class KafkaConfig {
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
+    public ConcurrentKafkaListenerContainerFactory<String, OutgoingTransactionEvent> outgoingListenerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, OutgoingTransactionEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(consumerFactory(Object.class, groupId));
+        factory.setConsumerFactory(consumerFactory(OutgoingTransactionEvent.class));
+        return factory;
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> responseListenerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory(TransactionResponseEvent.class));
         return factory;
     }
 }

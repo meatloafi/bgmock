@@ -1,7 +1,7 @@
 FROM maven:3.9-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Kopiera bank-service-projektet
+# Kopiera clearing-service-projektet
 COPY . .
 
 RUN mvn clean install -DskipTests

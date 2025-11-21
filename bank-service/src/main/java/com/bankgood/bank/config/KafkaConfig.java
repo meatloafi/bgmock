@@ -1,5 +1,6 @@
 package com.bankgood.bank.config;
 
+import com.bankgood.bank.event.IncomingTransactionEvent;
 import com.bankgood.bank.event.OutgoingTransactionEvent;
 import com.bankgood.bank.event.TransactionResponseEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
@@ -60,6 +61,8 @@ public class KafkaConfig {
 
         JsonDeserializer<T> jsonDeserializer = new JsonDeserializer<>(eventClass);
         jsonDeserializer.addTrustedPackages("*");
+        jsonDeserializer.ignoreTypeHeaders(); // kan hjälpa med __TypeId__ problem
+        jsonDeserializer.setRemoveTypeHeaders(false);
 
         return new DefaultKafkaConsumerFactory<>(
                 config,
@@ -68,12 +71,21 @@ public class KafkaConfig {
         );
     }
 
-    @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
 
-        factory.setConsumerFactory(consumerFactory(Object.class));
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, IncomingTransactionEvent> incomingListenerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, IncomingTransactionEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory(IncomingTransactionEvent.class));
         return factory;
     }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> responseListenerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory(TransactionResponseEvent.class));
+        return factory;
+    }
+
 }
