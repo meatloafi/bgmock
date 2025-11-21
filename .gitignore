@@ -37,3 +37,10 @@ logs/
 # Temporary files
 *.tmp
 *.bak
+
+# Python virtual environment
+venv/
+.venv/
+env/
+.env/
+__pycache__/
