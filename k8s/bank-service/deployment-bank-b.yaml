@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bankgood-bank-b
+  labels:
+    app: bankgood-bank
+    bank: b
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bankgood-bank
+      bank: b
+  template:
+    metadata:
+      labels:
+        app: bankgood-bank
+        bank: b
+    spec:
+      containers:
+        - name: bank-b
+          image: bank-service:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:postgresql://postgres-service-bank-b:5432/bank_b_db"
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config-bank-b
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret-bank-b
+                  key: POSTGRES_PASSWORD
+            - name: SPRING_JPA_HIBERNATE_DDL_AUTO
+              value: "update"
+            - name: SPRING_APPLICATION_NAME
+              value: "bank-b-service"
+            - name: BANK_CLEARING_NUMBER
+              value: "000002"
+
+            # Kafka config
+            - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
+              value: "bgmock-kafka-kafka-plain-bootstrap.kafka.svc.cluster.local:9092"
+            - name: SPRING_KAFKA_CONSUMER_GROUP_ID
+              value: "bank-group-${BANK_CLEARING_NUMBER}"
+            - name: SPRING_KAFKA_PRODUCER_KEY_SERIALIZER
+              value: "org.apache.kafka.common.serialization.StringSerializer"
+            - name: SPRING_KAFKA_PRODUCER_VALUE_SERIALIZER
+              value: "org.apache.kafka.common.serialization.StringSerializer"
+            - name: SPRING_KAFKA_CONSUMER_KEY_DESERIALIZER
+              value: "org.apache.kafka.common.serialization.StringDeserializer"
+            - name: SPRING_KAFKA_CONSUMER_VALUE_DESERIALIZER
+              value: "org.apache.kafka.common.serialization.StringDeserializer"
+
+          livenessProbe:
+            httpGet:
+              path: /bank/health
+              port: 8080
+            initialDelaySeconds: 50
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /bank/health
+              port: 8080
+            initialDelaySeconds: 40
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bankgood-bank-b-service
+  labels:
+    app: bankgood-bank
+    bank: b
+spec:
+  type: NodePort
+  selector:
+    app: bankgood-bank
+    bank: b
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+      nodePort: 30082
+      name: http
