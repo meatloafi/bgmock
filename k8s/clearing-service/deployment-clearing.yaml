@@ -45,7 +45,7 @@ spec:
 
             # Kafka config
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              value: "bgmock-kafka-kafka-plain-bootstrap.kafka.svc.cluster.local:9092"
+              value: "bgmock-kafka-kafka-bootstrap.kafka.svc.cluster.local:9092"
             - name: SPRING_KAFKA_CONSUMER_GROUP_ID
               value: "clearing-service-group"
             - name: SPRING_KAFKA_PRODUCER_KEY_SERIALIZER

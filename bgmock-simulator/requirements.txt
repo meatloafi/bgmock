@@ -1,4 +1,4 @@
-# BGMock Simulator - Minimal MVP
+# BGMock Simulator
 streamlit==1.28.1
 requests==2.31.0
 confluent-kafka==2.3.0

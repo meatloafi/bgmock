@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(kubectl get:*)",
+      "Bash(kubectl describe:*)",
+      "Bash(mvn clean install:*)",
+      "Bash(bash:*)",
+      "Bash(kubectl patch:*)",
+      "Bash(kubectl delete:*)",
+      "Bash(kubectl logs:*)",
+      "Bash(kubectl rollout restart:*)",
+      "Bash(kubectl rollout:*)",
+      "Bash(kubectl apply:*)",
+      "Bash(kubectl scale:*)",
+      "Bash(kubectl edit:*)",
+      "Bash(pkill:*)",
+      "Bash(curl:*)",
+      "Bash(killall:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
