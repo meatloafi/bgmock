@@ -17,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -161,5 +162,11 @@ public class TransactionService {
         });
 
         return ResponseEntity.ok("Processed transaction response forwarded successfully");
+    }
+
+    public ResponseEntity<?> getOutgoingTransactionById(UUID transactionId) {
+        return outgoingRepo.findByTransactionId(transactionId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 }

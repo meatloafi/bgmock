@@ -30,4 +30,10 @@ public class TransactionController {
     public ResponseEntity<?> handleProcessedTransaction(@RequestBody TransactionResponseEvent event) {
         return transactionService.handleProcessedTransaction(event);
     }
+
+    // ===================== FETCH TRANSACTION =====================
+    @GetMapping("/{transactionId}")
+    public ResponseEntity<?> getOutgoingTransactionById(@PathVariable UUID transactionId) {
+        return transactionService.getOutgoingTransactionById(transactionId);
+    }
 }
