@@ -58,7 +58,7 @@ spec:
 
           livenessProbe:
             httpGet:
-              path: /health
+              path: /bank/health
               port: 8080
             initialDelaySeconds: 160
             periodSeconds: 30
@@ -67,7 +67,7 @@ spec:
 
           readinessProbe:
             httpGet:
-              path: /health
+              path: /bank/health
               port: 8080
             initialDelaySeconds: 140
             periodSeconds: 10
