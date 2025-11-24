@@ -47,8 +47,6 @@ spec:
             # Kafka config
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: "bgmock-kafka-kafka-plain-bootstrap.kafka.svc.cluster.local:9092"
-            - name: SPRING_KAFKA_CONSUMER_GROUP_ID
-              value: "bank-group-${BANK_CLEARING_NUMBER}"
             - name: SPRING_KAFKA_PRODUCER_KEY_SERIALIZER
               value: "org.apache.kafka.common.serialization.StringSerializer"
             - name: SPRING_KAFKA_PRODUCER_VALUE_SERIALIZER
@@ -60,18 +58,18 @@ spec:
 
           livenessProbe:
             httpGet:
-              path: /bank/health
+              path: /health
               port: 8080
-            initialDelaySeconds: 50
+            initialDelaySeconds: 160
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 3
 
           readinessProbe:
             httpGet:
-              path: /bank/health
+              path: /health
               port: 8080
-            initialDelaySeconds: 40
+            initialDelaySeconds: 140
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
