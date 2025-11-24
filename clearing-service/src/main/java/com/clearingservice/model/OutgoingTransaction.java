@@ -20,7 +20,7 @@ import java.util.UUID;
 public class OutgoingTransaction {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    // @GeneratedValue(strategy = GenerationType.UUID)
     @Column(unique = true, updatable = false, nullable = false)
     private UUID transactionId;
 
@@ -51,8 +51,10 @@ public class OutgoingTransaction {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    public OutgoingTransaction(UUID fromAccountId, String fromClearingNumber, String fromAccountNumber,
-                               String toBankgoodNumber, BigDecimal amount) {
+    public OutgoingTransaction(UUID transactionId, UUID fromAccountId, String fromClearingNumber,
+            String fromAccountNumber,
+            String toBankgoodNumber, BigDecimal amount) {
+        this.transactionId = transactionId;
         this.fromAccountId = fromAccountId;
         this.fromClearingNumber = fromClearingNumber;
         this.fromAccountNumber = fromAccountNumber;

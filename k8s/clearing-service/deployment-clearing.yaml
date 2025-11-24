@@ -9,7 +9,7 @@ metadata:
   labels:
     app: bankgood-clearing
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: bankgood-clearing
@@ -45,9 +45,9 @@ spec:
 
             # Kafka config
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
-              value: "bgmock-kafka-kafka-bootstrap.kafka.svc.cluster.local:9092"
-            - name: SPRING_KAFKA_CONSUMER_GROUP_ID
-              value: "clearing-service-group"
+              value: "bgmock-kafka-kafka-plain-bootstrap.kafka.svc.cluster.local:9092"
+            # - name: SPRING_KAFKA_CONSUMER_GROUP_ID
+            #   value: "clearing-service-group"
             - name: SPRING_KAFKA_PRODUCER_KEY_SERIALIZER
               value: "org.apache.kafka.common.serialization.StringSerializer"
             - name: SPRING_KAFKA_PRODUCER_VALUE_SERIALIZER
@@ -56,25 +56,33 @@ spec:
               value: "org.apache.kafka.common.serialization.StringDeserializer"
             - name: SPRING_KAFKA_CONSUMER_VALUE_DESERIALIZER
               value: "org.apache.kafka.common.serialization.StringDeserializer"
+            
+            # Kafka tuning
+            - name: SPRING_KAFKA_CONSUMER_SESSION_TIMEOUT_MS
+              value: "60000"  # Increased from default 10s to 60s
+            - name: SPRING_KAFKA_CONSUMER_HEARTBEAT_INTERVAL_MS
+              value: "10000"  # Increased from default 3s to 10s
+            - name: SPRING_KAFKA_CONSUMER_MAX_POLL_INTERVAL_MS
+              value: "300000"  # 5 minutes
 
 
           livenessProbe:
             httpGet:
-              path: /health
+              path: /clearing/health
               port: 8080
-            initialDelaySeconds: 60
-            periodSeconds: 15
-            timeoutSeconds: 10
-            failureThreshold: 3
+            initialDelaySeconds: 120      # Give app time to start
+            periodSeconds: 30            # Check less frequently
+            timeoutSeconds: 5            # Quick timeout
+            failureThreshold: 2          # Allow 2 failures before killing
 
           readinessProbe:
             httpGet:
-              path: /health
+              path: /clearing/health
               port: 8080
-            initialDelaySeconds: 45
-            periodSeconds: 10
-            timeoutSeconds: 10
-            failureThreshold: 3
+            initialDelaySeconds: 100      # Start checking earlier
+            periodSeconds: 10            # Still frequent enough
+            timeoutSeconds: 5            # Quick timeout
+            failureThreshold: 3          # More tolerant of transient failures
           
           resources:
             requests:

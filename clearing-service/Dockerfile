@@ -1,22 +1,19 @@
-# Build stage
-FROM maven:3.9-eclipse-temurin-17 AS build
+# Stage 1: Build
+FROM maven:3.9.3-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Copy parent POM
+# 1️⃣ Copy only pom.xml first, download dependencies
 COPY pom.xml .
+RUN mvn dependency:go-offline -B
 
-# Copy all modules
-COPY common/ ./common/
-COPY bank-service/ ./bank-service/
-COPY clearing-service/ ./clearing-service/
+# 2️⃣ Copy the rest of the source code
+COPY src ./src
 
-# Build the entire project from root, then build clearing-service specifically
-RUN mvn clean install -DskipTests -pl clearing-service -am
-RUN ls -lh /app/clearing-service/target/*.jar
+# 3️⃣ Build project
+RUN mvn clean install -DskipTests
 
-# Runtime stage
+# Stage 2: Run
 FROM eclipse-temurin:17-jre
 WORKDIR /app
-COPY --from=build /app/clearing-service/target/*.jar app.jar
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+COPY --from=build /app/target/*.jar app.jar
+ENTRYPOINT ["java","-jar","app.jar"]

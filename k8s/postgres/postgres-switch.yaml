@@ -6,6 +6,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: postgres-config-clearing
+  namespace: default
 data:
   POSTGRES_DB: clearing_db
   POSTGRES_USER: clearing_user
@@ -15,6 +16,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: postgres-secret-clearing
+  namespace: default
 type: Opaque
 stringData:
   POSTGRES_PASSWORD: password
@@ -24,6 +26,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: postgres-pvc-clearing
+  namespace: default
 spec:
   accessModes:
     - ReadWriteOnce
@@ -36,6 +39,7 @@ apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgres-clearing
+  namespace: default
 spec:
   serviceName: postgres-service-clearing
   replicas: 1
@@ -93,6 +97,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres-service-clearing
+  namespace: default
 spec:
   type: ClusterIP
   selector:

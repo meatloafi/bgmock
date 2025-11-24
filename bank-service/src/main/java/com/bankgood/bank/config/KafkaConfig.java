@@ -1,8 +1,8 @@
 package com.bankgood.bank.config;
 
-import com.bankgood.common.event.OutgoingTransactionEvent;
-import com.bankgood.common.event.TransactionEvent;
-import com.bankgood.common.event.TransactionResponseEvent;
+import com.bankgood.bank.event.IncomingTransactionEvent;
+import com.bankgood.bank.event.OutgoingTransactionEvent;
+import com.bankgood.bank.event.TransactionResponseEvent;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -26,8 +26,8 @@ public class KafkaConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
-    @Value("${spring.kafka.consumer.group-id}")
-    private String groupId;
+    // @Value("${spring.kafka.consumer.group-id}")
+    // private String groupId;
 
 
     // ===================== PRODUCER =====================
@@ -62,11 +62,13 @@ public class KafkaConfig {
     private <T> ConsumerFactory<String, T> consumerFactory(Class<T> eventClass) {
         Map<String, Object> config = new HashMap<>();
         config.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        config.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
+        // config.put(ConsumerConfig.GROUP_ID_CONFIG, groupId);
         config.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
 
         JsonDeserializer<T> jsonDeserializer = new JsonDeserializer<>(eventClass);
         jsonDeserializer.addTrustedPackages("*");
+        jsonDeserializer.ignoreTypeHeaders(); // kan hjälpa med __TypeId__ problem
+        jsonDeserializer.setRemoveTypeHeaders(false);
 
         return new DefaultKafkaConsumerFactory<>(
                 config,
@@ -74,23 +76,19 @@ public class KafkaConfig {
                 jsonDeserializer);
     }
 
-    @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(consumerFactory(Object.class));
-        return factory;
-    }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, TransactionEvent> transactionListenerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, TransactionEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(consumerFactory(TransactionEvent.class));
+    public ConcurrentKafkaListenerContainerFactory<String, IncomingTransactionEvent> incomingListenerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, IncomingTransactionEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(consumerFactory(IncomingTransactionEvent.class));
         return factory;
     }
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> responseListenerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory(TransactionResponseEvent.class));
         return factory;
     }
