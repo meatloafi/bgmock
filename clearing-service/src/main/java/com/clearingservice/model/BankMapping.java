@@ -19,15 +19,15 @@ public class BankMapping {
     private UUID id;
 
     @Column(nullable = false, unique = true)
-    private String bankgoodNumber; // bankgironumret som skickas från bank-service
+    private String bankgoodNumber; 
 
     @Column(nullable = false)
-    private String clearingNumber;  // bankens clearingnummer
+    private String clearingNumber;  
 
     @Column(nullable = false)
-    private String accountNumber;   // mottagarens kontonummer
+    private String accountNumber;   
 
     @Column(nullable = false)
-    private String bankName;        // namn på bank (valfritt, men praktiskt)
+    private String bankName;       
 }
 
