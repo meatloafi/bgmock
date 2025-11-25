@@ -10,6 +10,8 @@ import com.clearingservice.repository.BankMappingRepository;
 import com.clearingservice.repository.IncomingTransactionRepository;
 import com.clearingservice.repository.OutgoingTransactionRepository;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -37,8 +39,8 @@ public class TransactionService {
             OutgoingTransactionRepository outgoingRepo,
             IncomingTransactionRepository incomingRepo,
             BankMappingRepository mappingRepo,
-            KafkaTemplate<String, IncomingTransactionEvent> forwardedTemplate,
-            KafkaTemplate<String, TransactionResponseEvent> completedTemplate) {
+            @Autowired(required = false) KafkaTemplate<String, IncomingTransactionEvent> forwardedTemplate,
+            @Autowired(required = false) KafkaTemplate<String, TransactionResponseEvent> completedTemplate) {
         this.outgoingRepo = outgoingRepo;
         this.incomingRepo = incomingRepo;
         this.mappingRepo = mappingRepo;
@@ -119,17 +121,18 @@ public class TransactionService {
          * 
          */ // TODO, ta bort allt som är kommenterat när bankMapping är klar.
 
-        forwardedTemplate.send(TOPIC_FORWARDED,
-                "00001",
-                new IncomingTransactionEvent(
-                        event.getTransactionId(),
-                        "00001",
-                        "1",
-                        event.getAmount(),
-                        TransactionStatus.PENDING,
-                        event.getCreatedAt(),
-                        LocalDateTime.now())); // TODO, ta bort denna detta när bankmapping är klart, det är hårdkodat.
-
+        if (forwardedTemplate != null) {
+            forwardedTemplate.send(TOPIC_FORWARDED,
+                    "00001",
+                    new IncomingTransactionEvent(
+                            event.getTransactionId(),
+                            "00001",
+                            "1",
+                            event.getAmount(),
+                            TransactionStatus.PENDING,
+                            event.getCreatedAt(),
+                            LocalDateTime.now()));
+        }
         return ResponseEntity.ok("Outgoing transaction processed and forwarded");
     }
 
@@ -150,15 +153,14 @@ public class TransactionService {
 
         // 2. Hämta outgoing transaktionen för att veta vilken bank som ska få svaret
         outgoingRepo.findByTransactionId(event.getTransactionId()).ifPresent(outgoing -> {
+            if (completedTemplate != null) {
+                completedTemplate.send(
+                        TOPIC_COMPLETED,
+                        outgoing.getFromClearingNumber(),
+                        event);
 
-            // Skicka tillbaka → transactions.completed (med key = avsändarbankens
-            // clearingnummer)
-            completedTemplate.send(
-                    TOPIC_COMPLETED,
-                    outgoing.getFromClearingNumber(),
-                    event);
-
-            log.info("Forwarded final response back to bank {}", outgoing.getFromClearingNumber());
+                log.info("Forwarded final response back to bank {}", outgoing.getFromClearingNumber());
+            }
         });
 
         return ResponseEntity.ok("Processed transaction response forwarded successfully");

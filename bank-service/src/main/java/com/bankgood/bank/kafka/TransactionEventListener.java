@@ -4,10 +4,12 @@ import com.bankgood.bank.event.IncomingTransactionEvent;
 import com.bankgood.bank.event.TransactionResponseEvent;
 import com.bankgood.bank.service.TransactionService;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 @Component
+@ConditionalOnProperty(name = "kafka.enabled", havingValue = "true", matchIfMissing = true)
 public class TransactionEventListener {
 
     // @Value("${spring.kafka.consumer.group-id}")

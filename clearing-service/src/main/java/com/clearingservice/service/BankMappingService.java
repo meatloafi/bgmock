@@ -12,24 +12,39 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @Service
 public class BankMappingService {
+    private final BankMappingRepository repository;
 
-    private final BankMappingRepository bankMappingRepository;
-
-    public BankMappingService(BankMappingRepository bankMappingRepository) {
-        this.bankMappingRepository = bankMappingRepository;
+    public BankMappingService(BankMappingRepository repository) {
+        this.repository = repository;
     }
 
     public BankMapping createBankMapping(BankMapping bankMapping) {
-        // Check if bankgood number already exists
-        if (bankMappingRepository.existsByBankgoodNumber(bankMapping.getBankgoodNumber())) {
-            throw new IllegalArgumentException(
-                "Bank-mapping already exists for Bankgood-number: " + bankMapping.getBankgoodNumber()
-            );
+        // Optional: check if bankgoodNumber already exists
+        if (repository.findByBankgoodNumber(bankMapping.getBankgoodNumber()).isPresent()) {
+            throw new IllegalArgumentException("BankMapping with this bankgoodNumber already exists");
         }
-        return bankMappingRepository.save(bankMapping);
+        return repository.save(bankMapping);
     }
 
     public Optional<BankMapping> fetchBankMapping(String bankgoodNumber) {
-        return bankMappingRepository.findByBankgoodNumber(bankgoodNumber);
+        return repository.findByBankgoodNumber(bankgoodNumber);
+    }
+
+    public Optional<BankMapping> updateBankMapping(String bankgoodNumber, BankMapping updatedMapping) {
+        return repository.findByBankgoodNumber(bankgoodNumber)
+                .map(existing -> {
+                    existing.setAccountNumber(updatedMapping.getAccountNumber());
+                    existing.setClearingNumber(updatedMapping.getClearingNumber());
+                    existing.setBankName(updatedMapping.getBankName());
+                    return repository.save(existing);
+                });
+    }
+
+    public boolean deleteBankMapping(String bankgoodNumber) {
+        return repository.findByBankgoodNumber(bankgoodNumber)
+                .map(mapping -> {
+                    repository.delete(mapping);
+                    return true;
+                }).orElse(false);
     }
 }
