@@ -2,9 +2,15 @@ package com.clearingservice.service;
 
 import java.util.Optional;
 
+import org.springframework.stereotype.Service;
+
 import com.clearingservice.model.BankMapping;
 import com.clearingservice.repository.BankMappingRepository;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+@Service
 public class BankMappingService {
 
     private final BankMappingRepository bankMappingRepository;
