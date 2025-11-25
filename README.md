@@ -75,3 +75,31 @@ curl -X POST http://localhost:8080/api/transactions \
         "status": "PENDING"
       }'
 ```
+
+--- 
+## Testing Locally Without Kafka
+
+To test the service locally without Kafka, you can disable Kafka bean creation by adding the following to your `application.properties`:
+
+```properties
+kafka.enabled=false
+```
+
+This allows you to run the service and test REST endpoints without needing a Kafka broker or redeploying to Kubernetes.
+
+### Port-forward the Database
+If your database is running in Kubernetes, forward it to your local machine:
+
+```bash
+kubectl port-forward svc/<postgres_service_name> 5432:5432
+```
+Then configure your local application.properties to connect to the forwarded database:
+
+```properties
+spring.datasource.url=jdbc:postgresql://localhost:5432/<postgres_db_name>
+spring.datasource.username=<postgres_db_user>
+spring.datasource.password=<postgres_password>
+spring.jpa.hibernate.ddl-auto=update
+```
+Now you can start your service locally and interact with it via REST endpoints.
+
