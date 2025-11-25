@@ -57,7 +57,7 @@ public class TransactionService {
         try {
             OutgoingTransaction transaction = new OutgoingTransaction(
                     event.getFromAccountId(),
-                    event.getFromClearingNumber(),
+                    fromClearingNumber,
                     event.getFromAccountNumber(),
                     event.getToBankgoodNumber(),
                     event.getAmount()
@@ -94,7 +94,7 @@ public class TransactionService {
         if (opt.isPresent()) {
             OutgoingTransaction transaction = opt.get();
             transaction.setFromAccountId(event.getFromAccountId());
-            transaction.setFromClearingNumber(event.getFromClearingNumber());
+            transaction.setFromClearingNumber(fromClearingNumber);
             transaction.setFromAccountNumber(event.getFromAccountNumber());
             transaction.setToBankgoodNumber(event.getToBankgoodNumber());
             transaction.setAmount(event.getAmount());

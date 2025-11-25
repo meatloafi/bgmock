@@ -80,17 +80,21 @@ public class TransactionService {
         // 2. Kontrollera bankgiro → clearing + account
         Optional<BankMapping> mappingOpt = mappingRepo.findByBankgoodNumber(event.getToBankgoodNumber());
 
+        if (mappingOpt.isEmpty()) {
+
+            TransactionResponseEvent failedResponse = new TransactionResponseEvent();
+            failedResponse.setTransactionId(event.getTransactionId());
+            failedResponse.setStatus(TransactionStatus.FAILED);
+            failedResponse.setMessage("No bank-mapping found for " + event.getToBankgoodNumber());
+
+            completedTemplate.send(TOPIC_COMPLETED, event.getFromClearingNumber(), failedResponse);
+            return ResponseEntity.ok("No bank-mapping found for " + event.getToBankgoodNumber());
+        }
         // TODO, fixa rätt bankmapping för lookup
         /*
-         * if (mappingOpt.isEmpty()) {
-         * log.warn("No mapping found for bankgiro {}", event.getToBankgoodNumber());
          * 
          * // Skicka FAILED response tillbaka till Bank A
-         * TransactionResponseEvent failedResponse = new TransactionResponseEvent(
-         * event.getTransactionId(),
-         * TransactionStatus.FAILED,
-         * "No bank mapping found for bankgiro"
-         * );
+
          * 
          * // Key = ursprungsbanken (frånClearingNumber)
          * completedTemplate.send(TOPIC_COMPLETED, event.getFromClearingNumber(),
@@ -121,18 +125,19 @@ public class TransactionService {
          * 
          */ // TODO, ta bort allt som är kommenterat när bankMapping är klar.
 
-        if (forwardedTemplate != null) {
-            forwardedTemplate.send(TOPIC_FORWARDED,
-                    "00001",
-                    new IncomingTransactionEvent(
-                            event.getTransactionId(),
-                            "00001",
-                            "1",
-                            event.getAmount(),
-                            TransactionStatus.PENDING,
-                            event.getCreatedAt(),
-                            LocalDateTime.now()));
-        }
+        // if (forwardedTemplate != null) {
+        //     forwardedTemplate.send(TOPIC_FORWARDED,
+        //             "00001",
+        //             new IncomingTransactionEvent(
+        //                     event.getTransactionId(),
+        //                     "00001",
+        //                     "1",
+        //                     event.getAmount(),
+        //                     TransactionStatus.PENDING,
+        //                     event.getCreatedAt(),
+        //                     LocalDateTime.now()));
+        // }
+        
         return ResponseEntity.ok("Outgoing transaction processed and forwarded");
     }
 
