@@ -18,6 +18,7 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -72,6 +73,7 @@ public class TransactionService {
             event.setFromClearingNumber(fromClearingNumber);
 
             sendOutgoingTransaction(event); // PRODUCE till Kafka
+            log.info("INITIATED: " + event.toString());
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
         } catch (Exception e) {
             log.error("Failed to create outgoing transaction", e);
@@ -209,10 +211,15 @@ public class TransactionService {
 
         // 1. Spara incoming transaktionen
         IncomingTransaction transaction = new IncomingTransaction(
+                event.getTransactionId(),
                 event.getToClearingNumber(),
                 event.getToAccountNumber(),
-                event.getAmount()
-        );
+                event.getAmount(),
+                event.getStatus(),
+                event.getCreatedAt(),
+                LocalDateTime.now()
+
+            );
         incomingRepo.save(transaction);
 
         // 2. Kontrollera om transaktionen kan genomföras
@@ -226,6 +233,7 @@ public class TransactionService {
 
 
         // 3. Skicka response tillbaka till clearing → transactions.processed
+        log.info("FORWARDED -> PROCESSED: " + response.toString());
         sendProcessedResponse(response);
     }
 

@@ -86,14 +86,12 @@ public class TransactionService {
                 event.getStatus(),
                 event.getCreatedAt(),
                 event.getUpdatedAt());
-
         try {
             outgoingRepo.save(outgoing);
         } catch (DataIntegrityViolationException e) {
             log.info("Transaction {} already processed", event.getTransactionId());
             return;
         }
-        log.info("Successfully saved transaction {}", outgoing);
 
         Optional<BankMapping> mappingOpt = mappingRepo.findByBankgoodNumber(event.getToBankgoodNumber());
 
@@ -111,6 +109,8 @@ public class TransactionService {
                         event.getFromClearingNumber(),
                         payload);
                 outboxEventRepo.save(outboxEvent);
+                log.info("INITIATED -> COMPLETED: " + failedResponse);
+
             } else {
                 BankMapping mapping = mappingOpt.get();
                 IncomingTransactionEvent incomingEvent = new IncomingTransactionEvent(
@@ -130,7 +130,7 @@ public class TransactionService {
                         payload);
                 outboxEventRepo.save(outboxEvent);
 
-                log.info("Saved outbox event for transaction {}", event.getTransactionId());
+                log.info("INITIATED -> FORWARDED: " + incomingEvent);
             }
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize event to JSON for transaction {}", event.getTransactionId(), e);
@@ -142,6 +142,8 @@ public class TransactionService {
      * CONSUMER: transactions.processed
      * Bank B skickar response → Clearing-service
      */
+
+    // TODO: Implement Outbox like above 
     @Transactional
     public ResponseEntity<?> handleProcessedTransaction(TransactionResponseEvent event) {
 
@@ -161,7 +163,8 @@ public class TransactionService {
                         outgoing.getFromClearingNumber(),
                         event);
 
-                log.info("Forwarded final response back to bank {}", outgoing.getFromClearingNumber());
+
+                log.info("PROCESSED -> COMPLETED: " + event.toString());
             }
         });
 
