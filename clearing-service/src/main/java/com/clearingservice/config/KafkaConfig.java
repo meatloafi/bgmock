@@ -41,6 +41,11 @@ public class KafkaConfig {
     }
 
     @Bean
+    public KafkaTemplate<String, Object> kafkaTemplate() {
+        return new KafkaTemplate<>(producerFactory());
+    }
+
+    @Bean
     public KafkaTemplate<String, IncomingTransactionEvent> incomingTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
@@ -65,22 +70,19 @@ public class KafkaConfig {
         return new DefaultKafkaConsumerFactory<>(
                 config,
                 new StringDeserializer(),
-                jsonDeserializer
-        );
+                jsonDeserializer);
     }
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, OutgoingTransactionEvent> outgoingListenerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, OutgoingTransactionEvent> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
+        ConcurrentKafkaListenerContainerFactory<String, OutgoingTransactionEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory(OutgoingTransactionEvent.class));
         return factory;
     }
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> responseListenerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
+        ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory(TransactionResponseEvent.class));
         return factory;
     }
