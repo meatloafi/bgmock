@@ -44,6 +44,8 @@ spec:
               value: "clearing-service"
 
             # Kafka config
+            - name: KAFKA_ENABLED
+              value: "true"
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
               value: "bgmock-kafka-kafka-plain-bootstrap.kafka.svc.cluster.local:9092"
             # - name: SPRING_KAFKA_CONSUMER_GROUP_ID
@@ -83,14 +85,14 @@ spec:
             periodSeconds: 10            # Still frequent enough
             timeoutSeconds: 5            # Quick timeout
             failureThreshold: 3          # More tolerant of transient failures
-          
           resources:
             requests:
-              memory: "512Mi"
-              cpu: "250m"
-            limits:
               memory: "1Gi"
-              cpu: "500m"
+              cpu: "1"
+            limits:
+              memory: "2Gi"
+              cpu: "2"
+
 
 ---
 apiVersion: v1

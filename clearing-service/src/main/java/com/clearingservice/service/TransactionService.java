@@ -12,6 +12,7 @@ import com.clearingservice.repository.OutgoingTransactionRepository;
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -53,17 +54,17 @@ public class TransactionService {
      * Bank A skickar TransactionOutgoingEvent → Clearing-service
      */
     @Transactional
-    public ResponseEntity<?> handleOutgoingTransaction(OutgoingTransactionEvent event) {
+    public void handleOutgoingTransaction(OutgoingTransactionEvent event) {
         log.info("Clearing-service received OutgoingTransactionEvent for bankgiro {}", event.getToBankgoodNumber());
 
-        // Check if transaction already exists
+        // Idemopotency check
         Optional<OutgoingTransaction> existing = outgoingRepo.findById(event.getTransactionId());
         if (existing.isPresent()) {
             log.info("Transaction {} already exists, skipping save", event.getTransactionId());
-            return ResponseEntity.ok(existing.get());
+            return;
         }
 
-        // 1. Spara outgoing transaction internt hos clearing
+        // Save to DB
         OutgoingTransaction outgoing = new OutgoingTransaction(
                 event.getTransactionId(),
                 event.getFromAccountId(),
@@ -74,66 +75,42 @@ public class TransactionService {
                 event.getStatus(),
                 event.getCreatedAt(),
                 event.getUpdatedAt());
-        outgoingRepo.save(outgoing);
-        log.info("Successfully saved transaction into DB: {}", outgoing);
 
-        // 2. Kontrollera bankgiro → clearing + account
+        try {
+            outgoingRepo.save(outgoing);
+        } catch (DataIntegrityViolationException e) {
+            log.info("Transaction {} already processed", event.getTransactionId());
+            return;
+        }
+        log.info("Successfully saved transaction {}", outgoing);
         Optional<BankMapping> mappingOpt = mappingRepo.findByBankgoodNumber(event.getToBankgoodNumber());
 
-        // TODO, fixa rätt bankmapping för lookup
-        /*
-         * if (mappingOpt.isEmpty()) {
-         * log.warn("No mapping found for bankgiro {}", event.getToBankgoodNumber());
-         * 
-         * // Skicka FAILED response tillbaka till Bank A
-         * TransactionResponseEvent failedResponse = new TransactionResponseEvent(
-         * event.getTransactionId(),
-         * TransactionStatus.FAILED,
-         * "No bank mapping found for bankgiro"
-         * );
-         * 
-         * // Key = ursprungsbanken (frånClearingNumber)
-         * completedTemplate.send(TOPIC_COMPLETED, event.getFromClearingNumber(),
-         * failedResponse);
-         * ResponseEntity.badRequest().body("No bank mapping found for bankgiro");;
-         * }
-         * 
-         * BankMapping mapping = mappingOpt.get();
-         * 
-         * // 3. Skapa IncomingTransactionEvent till mottagarbanken
-         * IncomingTransactionEvent incomingEvent = new IncomingTransactionEvent(
-         * event.getTransactionId(),
-         * mapping.getClearingNumber(),
-         * mapping.getAccountNumber(),
-         * event.getAmount(),
-         * TransactionStatus.PENDING,
-         * event.getCreatedAt(),
-         * LocalDateTime.now()
-         * );
-         * 
-         * // 4. Skicka vidare → transactions.forwarded (med key = mottagarbankens
-         * clearingnummer)
-         * forwardedTemplate.send(TOPIC_FORWARDED, mapping.getClearingNumber(),
-         * incomingEvent);
-         * 
-         * log.info("Forwarded incoming transaction to bank {} for account {}",
-         * mapping.getClearingNumber(), mapping.getAccountNumber());
-         * 
-         */ // TODO, ta bort allt som är kommenterat när bankMapping är klar.
+        // Check if bank-mapping exists
+        // If not, send a failed response back to bank
+        if (mappingOpt.isEmpty()) {
+            TransactionResponseEvent failedResponse = new TransactionResponseEvent();
+            failedResponse.setTransactionId(event.getTransactionId());
+            failedResponse.setStatus(TransactionStatus.FAILED);
+            failedResponse.setMessage("No bank-mapping found for " + event.getToBankgoodNumber());
+            completedTemplate.send(TOPIC_COMPLETED, event.getFromClearingNumber(), failedResponse);
+        } else {
+            BankMapping mapping = mappingOpt.get();
+            IncomingTransactionEvent incomingEvent = new IncomingTransactionEvent(
+                    event.getTransactionId(),
+                    mapping.getClearingNumber(),
+                    mapping.getAccountNumber(),
+                    event.getAmount(),
+                    TransactionStatus.PENDING,
+                    event.getCreatedAt(),
+                    LocalDateTime.now());
 
-        if (forwardedTemplate != null) {
-            forwardedTemplate.send(TOPIC_FORWARDED,
-                    "00001",
-                    new IncomingTransactionEvent(
-                            event.getTransactionId(),
-                            "00001",
-                            "1",
-                            event.getAmount(),
-                            TransactionStatus.PENDING,
-                            event.getCreatedAt(),
-                            LocalDateTime.now()));
+            // Send to recieving bank
+            forwardedTemplate.send(TOPIC_FORWARDED, mapping.getClearingNumber(),
+                    incomingEvent);
+
+            log.info("Forwarded incoming transaction to bank {} for account {}",
+                    mapping.getClearingNumber(), mapping.getAccountNumber());
         }
-        return ResponseEntity.ok("Outgoing transaction processed and forwarded");
     }
 
     /**

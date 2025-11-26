@@ -57,7 +57,7 @@ public class TransactionService {
         try {
             OutgoingTransaction transaction = new OutgoingTransaction(
                     event.getFromAccountId(),
-                    event.getFromClearingNumber(),
+                    fromClearingNumber,
                     event.getFromAccountNumber(),
                     event.getToBankgoodNumber(),
                     event.getAmount()
@@ -69,6 +69,7 @@ public class TransactionService {
             event.setStatus(saved.getStatus());
             event.setCreatedAt(saved.getCreatedAt());
             event.setUpdatedAt(saved.getUpdatedAt());
+            event.setFromClearingNumber(fromClearingNumber);
 
             sendOutgoingTransaction(event); // PRODUCE till Kafka
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);
@@ -94,7 +95,7 @@ public class TransactionService {
         if (opt.isPresent()) {
             OutgoingTransaction transaction = opt.get();
             transaction.setFromAccountId(event.getFromAccountId());
-            transaction.setFromClearingNumber(event.getFromClearingNumber());
+            transaction.setFromClearingNumber(fromClearingNumber);
             transaction.setFromAccountNumber(event.getFromAccountNumber());
             transaction.setToBankgoodNumber(event.getToBankgoodNumber());
             transaction.setAmount(event.getAmount());

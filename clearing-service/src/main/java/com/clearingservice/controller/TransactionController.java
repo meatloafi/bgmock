@@ -6,6 +6,7 @@ import com.clearingservice.service.TransactionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -19,10 +20,16 @@ public class TransactionController {
     }
 
     // ===================== OUTGOING TRANSACTIONS =====================
-
     @PostMapping("/outgoing")
     public ResponseEntity<?> createOutgoingTransaction(@RequestBody OutgoingTransactionEvent event) {
-        return transactionService.handleOutgoingTransaction(event);
+        try {
+            transactionService.handleOutgoingTransaction(event);
+            return ResponseEntity.accepted().body(Map.of(
+                    "message", "Transaction accepted for processing",
+                    "transactionId", event.getTransactionId()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     // Endpoint för att simulera att en bank skickar processed-response (för test)
