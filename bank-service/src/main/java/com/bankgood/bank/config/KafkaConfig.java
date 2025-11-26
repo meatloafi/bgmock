@@ -64,7 +64,6 @@ public class KafkaConfig {
         JsonDeserializer<T> jsonDeserializer = new JsonDeserializer<>(eventClass);
         jsonDeserializer.addTrustedPackages("*");
         jsonDeserializer.ignoreTypeHeaders(); // kan hjälpa med __TypeId__ problem
-        jsonDeserializer.setRemoveTypeHeaders(false);
 
         return new DefaultKafkaConsumerFactory<>(
                 config,

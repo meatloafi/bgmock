@@ -62,8 +62,8 @@ spec:
             httpGet:
               path: /bank/health
               port: 8080
-            initialDelaySeconds: 50
-            periodSeconds: 30
+            initialDelaySeconds: 40
+            periodSeconds: 15
             timeoutSeconds: 10
             failureThreshold: 3
 
@@ -71,10 +71,11 @@ spec:
             httpGet:
               path: /bank/health
               port: 8080
-            initialDelaySeconds: 40
+            initialDelaySeconds: 30
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
+
 
           resources:
             requests:
