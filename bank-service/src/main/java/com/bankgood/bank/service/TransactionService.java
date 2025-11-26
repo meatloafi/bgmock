@@ -69,6 +69,7 @@ public class TransactionService {
             event.setStatus(saved.getStatus());
             event.setCreatedAt(saved.getCreatedAt());
             event.setUpdatedAt(saved.getUpdatedAt());
+            event.setFromClearingNumber(fromClearingNumber);
 
             sendOutgoingTransaction(event); // PRODUCE till Kafka
             return ResponseEntity.status(HttpStatus.CREATED).body(saved);

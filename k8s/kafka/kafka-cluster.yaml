@@ -14,11 +14,11 @@ spec:
     type: ephemeral
   resources:
     requests:
-      memory: 512Mi
-      cpu: 250m
-    limits:
       memory: 1Gi
-      cpu: 500m
+      cpu: 1
+    limits:
+      memory: 2Gi
+      cpu: 2
 ---
 apiVersion: kafka.strimzi.io/v1beta2
 kind: Kafka
