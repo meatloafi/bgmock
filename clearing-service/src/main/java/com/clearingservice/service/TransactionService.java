@@ -4,11 +4,16 @@ import com.clearingservice.event.IncomingTransactionEvent;
 import com.clearingservice.event.OutgoingTransactionEvent;
 import com.clearingservice.event.TransactionResponseEvent;
 import com.clearingservice.model.BankMapping;
+import com.clearingservice.model.OutboxEvent;
 import com.clearingservice.model.OutgoingTransaction;
 import com.clearingservice.model.TransactionStatus;
 import com.clearingservice.repository.BankMappingRepository;
 import com.clearingservice.repository.IncomingTransactionRepository;
+import com.clearingservice.repository.OutboxEventRepository;
 import com.clearingservice.repository.OutgoingTransactionRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import lombok.extern.slf4j.Slf4j;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,22 +34,30 @@ public class TransactionService {
     private static final String TOPIC_FORWARDED = "transactions.forwarded";
     private static final String TOPIC_COMPLETED = "transactions.completed";
 
+    private final ObjectMapper objectMapper;
+
+
     private final OutgoingTransactionRepository outgoingRepo;
     private final IncomingTransactionRepository incomingRepo;
     private final BankMappingRepository mappingRepo;
+    private final OutboxEventRepository outboxEventRepo;
 
     private final KafkaTemplate<String, IncomingTransactionEvent> forwardedTemplate;
     private final KafkaTemplate<String, TransactionResponseEvent> completedTemplate;
 
     public TransactionService(
+            ObjectMapper objectMapper,
             OutgoingTransactionRepository outgoingRepo,
             IncomingTransactionRepository incomingRepo,
             BankMappingRepository mappingRepo,
+            OutboxEventRepository outboxEventRepo,
             @Autowired(required = false) KafkaTemplate<String, IncomingTransactionEvent> forwardedTemplate,
             @Autowired(required = false) KafkaTemplate<String, TransactionResponseEvent> completedTemplate) {
+        this.objectMapper = objectMapper;
         this.outgoingRepo = outgoingRepo;
         this.incomingRepo = incomingRepo;
         this.mappingRepo = mappingRepo;
+        this.outboxEventRepo = outboxEventRepo;
         this.forwardedTemplate = forwardedTemplate;
         this.completedTemplate = completedTemplate;
     }
@@ -57,14 +70,12 @@ public class TransactionService {
     public void handleOutgoingTransaction(OutgoingTransactionEvent event) {
         log.info("Clearing-service received OutgoingTransactionEvent for bankgiro {}", event.getToBankgoodNumber());
 
-        // Idemopotency check
         Optional<OutgoingTransaction> existing = outgoingRepo.findById(event.getTransactionId());
         if (existing.isPresent()) {
-            log.info("Transaction {} already exists, skipping save", event.getTransactionId());
+            log.info("Transaction {} already exists, skipping", event.getTransactionId());
             return;
         }
 
-        // Save to DB
         OutgoingTransaction outgoing = new OutgoingTransaction(
                 event.getTransactionId(),
                 event.getFromAccountId(),
@@ -83,33 +94,47 @@ public class TransactionService {
             return;
         }
         log.info("Successfully saved transaction {}", outgoing);
+
         Optional<BankMapping> mappingOpt = mappingRepo.findByBankgoodNumber(event.getToBankgoodNumber());
 
-        // Check if bank-mapping exists
-        // If not, send a failed response back to bank
-        if (mappingOpt.isEmpty()) {
-            TransactionResponseEvent failedResponse = new TransactionResponseEvent();
-            failedResponse.setTransactionId(event.getTransactionId());
-            failedResponse.setStatus(TransactionStatus.FAILED);
-            failedResponse.setMessage("No bank-mapping found for " + event.getToBankgoodNumber());
-            completedTemplate.send(TOPIC_COMPLETED, event.getFromClearingNumber(), failedResponse);
-        } else {
-            BankMapping mapping = mappingOpt.get();
-            IncomingTransactionEvent incomingEvent = new IncomingTransactionEvent(
-                    event.getTransactionId(),
-                    mapping.getClearingNumber(),
-                    mapping.getAccountNumber(),
-                    event.getAmount(),
-                    TransactionStatus.PENDING,
-                    event.getCreatedAt(),
-                    LocalDateTime.now());
+        try {
+            if (mappingOpt.isEmpty()) {
+                TransactionResponseEvent failedResponse = new TransactionResponseEvent();
+                failedResponse.setTransactionId(event.getTransactionId());
+                failedResponse.setStatus(TransactionStatus.FAILED);
+                failedResponse.setMessage("No bank-mapping found for " + event.getToBankgoodNumber());
 
-            // Send to recieving bank
-            forwardedTemplate.send(TOPIC_FORWARDED, mapping.getClearingNumber(),
-                    incomingEvent);
+                String payload = objectMapper.writeValueAsString(failedResponse);
+                OutboxEvent outboxEvent = new OutboxEvent(
+                        event.getTransactionId(),
+                        TOPIC_COMPLETED,
+                        event.getFromClearingNumber(),
+                        payload);
+                outboxEventRepo.save(outboxEvent);
+            } else {
+                BankMapping mapping = mappingOpt.get();
+                IncomingTransactionEvent incomingEvent = new IncomingTransactionEvent(
+                        event.getTransactionId(),
+                        mapping.getClearingNumber(),
+                        mapping.getAccountNumber(),
+                        event.getAmount(),
+                        TransactionStatus.PENDING,
+                        event.getCreatedAt(),
+                        LocalDateTime.now());
 
-            log.info("Forwarded incoming transaction to bank {} for account {}",
-                    mapping.getClearingNumber(), mapping.getAccountNumber());
+                String payload = objectMapper.writeValueAsString(incomingEvent);
+                OutboxEvent outboxEvent = new OutboxEvent(
+                        event.getTransactionId(),
+                        TOPIC_FORWARDED,
+                        mapping.getClearingNumber(),
+                        payload);
+                outboxEventRepo.save(outboxEvent);
+
+                log.info("Saved outbox event for transaction {}", event.getTransactionId());
+            }
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize event to JSON for transaction {}", event.getTransactionId(), e);
+            throw new RuntimeException("Failed to process transaction", e);
         }
     }
 
