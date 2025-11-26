@@ -55,7 +55,7 @@ public class OutboxEventPublisher {
 
                 // Send to Kafka
                 kafkaTemplate.send(event.getTopic(), event.getMessageKey(), payloadObj).get();
-
+                log.info(payloadObj.toString());
                 // Mark as published only after successful send
                 event.setPublished(true);
                 outboxEventRepo.save(event);
