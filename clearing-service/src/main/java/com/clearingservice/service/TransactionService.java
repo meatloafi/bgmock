@@ -115,7 +115,7 @@ public class TransactionService {
                         payload);
                 outboxEventRepo.save(outboxEvent);
 
-                log.info("INITIATED -> FORWARDED: " + incomingEvent);
+                log.info("INITIATED -> FORWARDED: " + incomingEvent.toString());
             }
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize event to JSON for transaction {}", event.getTransactionId(), e);

@@ -11,5 +11,5 @@ import com.clearingservice.model.OutboxEvent;
 @Repository
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> {
     List<OutboxEvent> findByPublishedFalseOrderByCreatedAtAsc();
-    boolean existsByTransactionIdAndTopic(UUID transactionId, String topic );
+    boolean existsByTransactionIdAndTopic(UUID transactionId, String topic);
 }

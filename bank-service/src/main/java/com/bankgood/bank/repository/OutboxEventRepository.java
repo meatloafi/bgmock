@@ -11,4 +11,5 @@ import com.bankgood.bank.model.OutboxEvent;
 @Repository
 public interface OutboxEventRepository extends JpaRepository<OutboxEvent, Long> {
     List<OutboxEvent> findByPublishedFalseOrderByCreatedAtAsc();
+    boolean existsByTransactionIdAndTopic(UUID transactionId, String topic);
 }

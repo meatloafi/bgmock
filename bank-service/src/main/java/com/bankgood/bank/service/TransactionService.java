@@ -69,22 +69,22 @@ public class TransactionService {
     @Transactional
     public void createOutgoingTransaction(OutgoingTransactionEvent event) {
         // TODO: Idempotency check
+
+        OutgoingTransaction transaction = new OutgoingTransaction(
+                event.getFromAccountId(),
+                fromClearingNumber,
+                event.getFromAccountNumber(),
+                event.getToBankgoodNumber(),
+                event.getAmount());
+
+        OutgoingTransaction saved = outgoingRepo.save(transaction);
+
+        event.setTransactionId(saved.getTransactionId());
+        event.setStatus(saved.getStatus());
+        event.setCreatedAt(saved.getCreatedAt());
+        event.setUpdatedAt(saved.getUpdatedAt());
+        event.setFromClearingNumber(fromClearingNumber);
         try {
-            OutgoingTransaction transaction = new OutgoingTransaction(
-                    event.getFromAccountId(),
-                    fromClearingNumber,
-                    event.getFromAccountNumber(),
-                    event.getToBankgoodNumber(),
-                    event.getAmount());
-
-            OutgoingTransaction saved = outgoingRepo.save(transaction);
-
-            event.setTransactionId(saved.getTransactionId());
-            event.setStatus(saved.getStatus());
-            event.setCreatedAt(saved.getCreatedAt());
-            event.setUpdatedAt(saved.getUpdatedAt());
-            event.setFromClearingNumber(fromClearingNumber);
-
             String payload = objectMapper.writeValueAsString(event);
 
             OutboxEvent outboxEvent = new OutboxEvent(
@@ -93,7 +93,7 @@ public class TransactionService {
                     fromClearingNumber,
                     payload);
             outboxEventRepo.save(outboxEvent);
-            // sendOutgoingTransaction(event); 
+            // sendOutgoingTransaction(event);
             log.info("INITIATED: " + event.toString());
 
         } catch (JsonProcessingException e) {
@@ -223,8 +223,10 @@ public class TransactionService {
         initiatedTemplate.send(TOPIC_INITIATED, event);
     }
 
-    // ===================== INCOMING: CONSUME forwarded =====================
-
+    /**
+     * CONSUMER: transactions.forwarded
+     * Bank sends response to Clearing-service
+     */
     @Transactional
     public void handleIncomingTransaction(IncomingTransactionEvent event) {
         log.info("Received IncomingTransactionEvent for account {}", event.getToAccountNumber());
@@ -241,19 +243,35 @@ public class TransactionService {
 
         );
         incomingRepo.save(transaction);
-
         // 2. Kontrollera om transaktionen kan genomföras
         boolean success = true; // TODO: saldo-kontroll
 
         TransactionResponseEvent response = new TransactionResponseEvent(
                 event.getTransactionId(),
-                success ? TransactionStatus.SUCCESS : TransactionStatus.FAILED, // Sätt rätt status
-                success ? "Transaction processed" : "Insufficient funds" // Sätt rätt message
-        );
+                success ? TransactionStatus.SUCCESS : TransactionStatus.FAILED,
+                success ? "Transaction processed" : "Insufficient funds");
+        try {
+            boolean alreadyExists = outboxEventRepo.existsByTransactionIdAndTopic(
+                    event.getTransactionId(), TOPIC_PROCESSED);
+
+            if (!alreadyExists) {
+                String payload = objectMapper.writeValueAsString(response);
+                OutboxEvent outboxEvent = new OutboxEvent(
+                        event.getTransactionId(),
+                        TOPIC_PROCESSED,
+                        fromClearingNumber,
+                        payload);
+                outboxEventRepo.save(outboxEvent);
+
+                log.info("FORWARDED -> PROCESSED: " + response.toString());
+            }
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize event to JSON for transaction {}", event.getTransactionId(), e);
+            throw new RuntimeException("Failed to process transaction", e);
+        }
 
         // 3. Skicka response tillbaka till clearing → transactions.processed
-        log.info("FORWARDED -> PROCESSED: " + response.toString());
-        sendProcessedResponse(response);
+        // sendProcessedResponse(response);
     }
 
     public void sendProcessedResponse(TransactionResponseEvent event) {
