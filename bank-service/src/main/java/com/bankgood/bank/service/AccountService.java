@@ -62,6 +62,12 @@ public class AccountService {
         return toDTO(account);
     }
 
+    public AccountDTO getAccount(String accountNumber) {
+        Account account = accountRepository.findByAccountNumber(accountNumber)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
+        return toDTO(account);
+    }
+
     public List<AccountDTO> getAllAccounts() {
         List<Account> accounts = accountRepository.findAll();
         return toDTOList(accounts);
