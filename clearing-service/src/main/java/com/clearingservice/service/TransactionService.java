@@ -53,11 +53,10 @@ public class TransactionService {
      */
     @Transactional
     public void handleOutgoingTransaction(OutgoingTransactionEvent event) {
-        log.info("Clearing-service received OutgoingTransactionEvent for bankgiro {}", event.getToBankgoodNumber());
 
         Optional<OutgoingTransaction> existing = outgoingRepo.findById(event.getTransactionId());
         if (existing.isPresent()) {
-            log.info("Transaction {} already exists, skipping", event.getTransactionId());
+            log.warn("Transaction {} already exists", event.getTransactionId());
             return;
         }
 
@@ -94,7 +93,7 @@ public class TransactionService {
                         event.getFromClearingNumber(),
                         payload);
                 outboxEventRepo.save(outboxEvent);
-                log.info("INITIATED -> COMPLETED: " + failedResponse);
+                log.info("Rejected transaction with ID {}. Reason: {}", failedResponse.getTransactionId(), failedResponse.getMessage());
 
             } else {
                 BankMapping mapping = mappingOpt.get();
@@ -115,7 +114,7 @@ public class TransactionService {
                         payload);
                 outboxEventRepo.save(outboxEvent);
 
-                log.info("INITIATED -> FORWARDED: " + incomingEvent.toString());
+                log.info("Forwarded transaction with ID: {}", incomingEvent.getTransactionId());
             }
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize event to JSON for transaction {}", event.getTransactionId(), e);
@@ -152,6 +151,7 @@ public class TransactionService {
                         transaction.getFromClearingNumber(),
                         payload);
                 outboxEventRepo.save(outboxEvent);
+                log.info("Sent response for ID: {}", event.getTransactionId());
             }
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize event to JSON for transaction {}", event.getTransactionId(), e);

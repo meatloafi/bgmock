@@ -94,7 +94,7 @@ public class TransactionService {
                     payload);
             outboxEventRepo.save(outboxEvent);
             // sendOutgoingTransaction(event);
-            log.info("INITIATED: " + event.toString());
+            log.info("Initiated transaction with ID: " + event.getTransactionId());
 
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize event to JSON for transaction {}", event.getTransactionId(), e);
@@ -219,7 +219,6 @@ public class TransactionService {
     // ===================== OUTGOING: PRODUCE initiated =====================
 
     public void sendOutgoingTransaction(OutgoingTransactionEvent event) {
-        log.info("Producing OutgoingTransactionEvent → transactions.initiated");
         initiatedTemplate.send(TOPIC_INITIATED, event);
     }
 
@@ -229,7 +228,7 @@ public class TransactionService {
      */
     @Transactional
     public void handleIncomingTransaction(IncomingTransactionEvent event) {
-        log.info("Received IncomingTransactionEvent for account {}", event.getToAccountNumber());
+        log.info("Received transaction with ID: ", event.getTransactionId());
 
         // 1. Spara incoming transaktionen
         IncomingTransaction transaction = new IncomingTransaction(
@@ -263,7 +262,7 @@ public class TransactionService {
                         payload);
                 outboxEventRepo.save(outboxEvent);
 
-                log.info("FORWARDED -> PROCESSED: " + response.toString());
+                log.info("Processed transaction with ID: " + event.getTransactionId());
             }
         } catch (JsonProcessingException e) {
             log.error("Failed to serialize event to JSON for transaction {}", event.getTransactionId(), e);
