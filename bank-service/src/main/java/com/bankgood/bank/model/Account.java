@@ -26,7 +26,6 @@ public class Account {
     @Column(unique = true, updatable = false, nullable = false)
     private UUID accountId;
 
-
     @Column(unique = true, nullable = false)
     @NotBlank(message = "Account number is required")
     private String accountNumber;
@@ -39,6 +38,9 @@ public class Account {
     @DecimalMin(value = "0.0", inclusive = true, message = "Balance cannot be negative")
     private BigDecimal balance;
 
+    @Column(nullable = false)
+    @DecimalMin(value = "0.0", inclusive = true, message = "ReservedBalance cannot be negative")
+    private BigDecimal reservedBalance;
 
     // Uses optimistic locking to prevent race conditions when two requests tries to
     // access the same account at the same time
