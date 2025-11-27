@@ -35,11 +35,11 @@ public class Account {
     private String accountHolder;
 
     @Column(nullable = false)
-    @DecimalMin(value = "0.0", inclusive = true, message = "Balance cannot be negative")
+    @DecimalMin(value = "0.0", message = "Balance cannot be negative")
     private BigDecimal balance;
 
     @Column(nullable = false)
-    @DecimalMin(value = "0.0", inclusive = true, message = "ReservedBalance cannot be negative")
+    @DecimalMin(value = "0.0", message = "ReservedBalance cannot be negative")
     private BigDecimal reservedBalance;
 
     // Uses optimistic locking to prevent race conditions when two requests tries to

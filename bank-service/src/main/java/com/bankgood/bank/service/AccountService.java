@@ -27,6 +27,7 @@ public class AccountService {
                 account.getAccountNumber(),
                 account.getAccountHolder(),
                 account.getBalance(),
+                account.getReservedBalance(),
                 account.getCreatedAt(),
                 account.getUpdatedAt()
         );
@@ -38,6 +39,7 @@ public class AccountService {
         account.setAccountNumber(dto.getAccountNumber());
         account.setAccountHolder(dto.getAccountHolder());
         account.setBalance(dto.getBalance());
+        account.setReservedBalance(dto.getReservedBalance());
         return account;
     }
 
@@ -76,7 +78,6 @@ public class AccountService {
 
         existing.setAccountHolder(dto.getAccountHolder());
         existing.setAccountNumber(dto.getAccountNumber());
-        existing.setBalance(dto.getBalance());
         Account updated = accountRepository.save(existing);
         return toDTO(updated);
     }
@@ -88,18 +89,67 @@ public class AccountService {
         accountRepository.delete(existing);
     }
 
+    // =================== TRANSACTION LOGIC ===================
     @Transactional
-    public AccountDTO adjustBalance(UUID accountId, BigDecimal amount) {
+    public AccountDTO deposit(UUID accountId, BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Deposit amount must be positive");
+
         Account account = accountRepository.findById(accountId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
 
-        BigDecimal newBalance = account.getBalance().add(amount);
-        if (newBalance.compareTo(BigDecimal.ZERO) < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient funds");
-        }
-
-        accountRepository.updateBalance(accountId, newBalance);
-        account.setBalance(newBalance);
+        account.setBalance(account.getBalance().add(amount));
         return toDTO(account);
     }
+
+    @Transactional
+    public AccountDTO reserveFunds(UUID accountId, BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Amount must be positive");
+
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
+
+        BigDecimal available = account.getBalance().subtract(account.getReservedBalance());
+        if (available.compareTo(amount) < 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient available funds");
+
+        account.setReservedBalance(account.getReservedBalance().add(amount));
+
+        return toDTO(account);
+    }
+
+    @Transactional
+    public AccountDTO commitReservedFunds(UUID accountId, BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Amount must be positive");
+
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
+
+        if (account.getReservedBalance().compareTo(amount) < 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Not enough reserved funds");
+
+        account.setReservedBalance(account.getReservedBalance().subtract(amount));
+        account.setBalance(account.getBalance().subtract(amount));
+
+        return toDTO(account);
+    }
+
+    @Transactional
+    public AccountDTO releaseReservedFunds(UUID accountId, BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Amount must be positive");
+
+        Account account = accountRepository.findById(accountId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
+
+        if (account.getReservedBalance().compareTo(amount) < 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Not enough reserved funds to release");
+
+        account.setReservedBalance(account.getReservedBalance().subtract(amount));
+
+        return toDTO(account);
+    }
+
 }

@@ -45,8 +45,31 @@ public class AccountController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/{id}/adjust")
-    public ResponseEntity<AccountDTO> adjustBalance(@PathVariable UUID id, @RequestParam BigDecimal amount) {
-        return ResponseEntity.ok(accountService.adjustBalance(id, amount));
+    @PostMapping("/{id}/deposit")
+    public ResponseEntity<AccountDTO> deposit(
+            @PathVariable UUID id,
+            @RequestParam BigDecimal amount) {
+        return ResponseEntity.ok(accountService.deposit(id, amount));
+    }
+
+    @PostMapping("/{id}/reserve")
+    public ResponseEntity<AccountDTO> reserveFunds(
+            @PathVariable UUID id,
+            @RequestParam BigDecimal amount) {
+        return ResponseEntity.ok(accountService.reserveFunds(id, amount));
+    }
+
+    @PostMapping("/{id}/commit")
+    public ResponseEntity<AccountDTO> commitReservedFunds(
+            @PathVariable UUID id,
+            @RequestParam BigDecimal amount) {
+        return ResponseEntity.ok(accountService.commitReservedFunds(id, amount));
+    }
+
+    @PostMapping("/{id}/release")
+    public ResponseEntity<AccountDTO> releaseReservedFunds(
+            @PathVariable UUID id,
+            @RequestParam BigDecimal amount) {
+        return ResponseEntity.ok(accountService.releaseReservedFunds(id, amount));
     }
 }
