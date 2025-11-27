@@ -90,6 +90,15 @@ public class AccountService {
     }
 
     // =================== TRANSACTION LOGIC ===================
+
+    /**
+     * Deposits a positive amount into the specified account.
+     *
+     * @param accountId the UUID of the account
+     * @param amount the amount to deposit (must be positive)
+     * @return the updated AccountDTO
+     * @throws ResponseStatusException if the account is not found or the amount is non-positive
+     */
     @Transactional
     public AccountDTO deposit(UUID accountId, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0)
@@ -102,6 +111,15 @@ public class AccountService {
         return toDTO(account);
     }
 
+    /**
+     * Reserves a specified amount from the available balance of the account.
+     * The reserved amount is locked for a pending transaction.
+     *
+     * @param accountId the UUID of the account
+     * @param amount the amount to reserve (must be positive and <= available balance)
+     * @return the updated AccountDTO
+     * @throws ResponseStatusException if the account is not found, the amount is non-positive, or insufficient funds
+     */
     @Transactional
     public AccountDTO reserveFunds(UUID accountId, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0)
@@ -119,6 +137,15 @@ public class AccountService {
         return toDTO(account);
     }
 
+    /**
+     * Commits a previously reserved amount, deducting it from the total balance.
+     * Should be called when the transaction is confirmed/settled.
+     *
+     * @param accountId the UUID of the account
+     * @param amount the amount to commit (must be positive and <= reserved balance)
+     * @return the updated AccountDTO
+     * @throws ResponseStatusException if the account is not found, the amount is non-positive, or insufficient reserved funds
+     */
     @Transactional
     public AccountDTO commitReservedFunds(UUID accountId, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0)
@@ -136,6 +163,15 @@ public class AccountService {
         return toDTO(account);
     }
 
+    /**
+     * Releases a previously reserved amount back to the available balance.
+     * Should be called when the transaction is cancelled or fails.
+     *
+     * @param accountId the UUID of the account
+     * @param amount the amount to release (must be positive and <= reserved balance)
+     * @return the updated AccountDTO
+     * @throws ResponseStatusException if the account is not found, the amount is non-positive, or insufficient reserved funds
+     */
     @Transactional
     public AccountDTO releaseReservedFunds(UUID accountId, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0)
