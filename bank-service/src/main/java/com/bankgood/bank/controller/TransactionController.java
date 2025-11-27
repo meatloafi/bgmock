@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/bank/transactions")
+@RequestMapping("/bank/transaction")
 @RequiredArgsConstructor
 public class TransactionController {
 
