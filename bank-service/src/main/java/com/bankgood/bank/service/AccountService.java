@@ -38,8 +38,8 @@ public class AccountService {
         account.setAccountId(dto.getAccountId());
         account.setAccountNumber(dto.getAccountNumber());
         account.setAccountHolder(dto.getAccountHolder());
-        account.setBalance(dto.getBalance());
-        account.setReservedBalance(dto.getReservedBalance());
+        account.setBalance(dto.getBalance() != null ? dto.getBalance() : BigDecimal.ZERO);
+        account.setReservedBalance(dto.getReservedBalance() != null ? dto.getReservedBalance() : BigDecimal.ZERO);
         return account;
     }
 
