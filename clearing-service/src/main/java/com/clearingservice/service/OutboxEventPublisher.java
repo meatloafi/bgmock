@@ -9,7 +9,6 @@ import org.springframework.stereotype.Component;
 import com.clearingservice.model.OutboxEvent;
 import com.clearingservice.repository.OutboxEventRepository;
 
-import jakarta.transaction.Transactional;
 import lombok.extern.slf4j.Slf4j;
 import com.clearingservice.event.IncomingTransactionEvent;
 import com.clearingservice.event.TransactionResponseEvent;
@@ -32,7 +31,6 @@ public class OutboxEventPublisher {
     }
 
     @Scheduled(fixedRate = 1000)
-    @Transactional
     public void publishPendingEvents() {
         List<OutboxEvent> pendingEvents = outboxEventRepo.findByPublishedFalseOrderByCreatedAtAsc();
 
@@ -50,7 +48,7 @@ public class OutboxEventPublisher {
                         break;
                     default:
                         log.warn("Unknown topic {} for OutboxEvent id={}", event.getTopic(), event.getId());
-                        continue; // skip this event
+                        continue; 
                 }
 
                 // Send to Kafka

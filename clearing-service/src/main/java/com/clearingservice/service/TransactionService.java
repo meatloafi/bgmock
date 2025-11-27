@@ -8,7 +8,6 @@ import com.clearingservice.model.OutboxEvent;
 import com.clearingservice.model.OutgoingTransaction;
 import com.clearingservice.model.TransactionStatus;
 import com.clearingservice.repository.BankMappingRepository;
-import com.clearingservice.repository.IncomingTransactionRepository;
 import com.clearingservice.repository.OutboxEventRepository;
 import com.clearingservice.repository.OutgoingTransactionRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -16,10 +15,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,31 +32,19 @@ public class TransactionService {
     private static final String TOPIC_COMPLETED = "transactions.completed";
 
     private final ObjectMapper objectMapper;
-
-
     private final OutgoingTransactionRepository outgoingRepo;
-    private final IncomingTransactionRepository incomingRepo;
     private final BankMappingRepository mappingRepo;
     private final OutboxEventRepository outboxEventRepo;
-
-    private final KafkaTemplate<String, IncomingTransactionEvent> forwardedTemplate;
-    private final KafkaTemplate<String, TransactionResponseEvent> completedTemplate;
 
     public TransactionService(
             ObjectMapper objectMapper,
             OutgoingTransactionRepository outgoingRepo,
-            IncomingTransactionRepository incomingRepo,
             BankMappingRepository mappingRepo,
-            OutboxEventRepository outboxEventRepo,
-            @Autowired(required = false) KafkaTemplate<String, IncomingTransactionEvent> forwardedTemplate,
-            @Autowired(required = false) KafkaTemplate<String, TransactionResponseEvent> completedTemplate) {
+            OutboxEventRepository outboxEventRepo) {
         this.objectMapper = objectMapper;
         this.outgoingRepo = outgoingRepo;
-        this.incomingRepo = incomingRepo;
         this.mappingRepo = mappingRepo;
         this.outboxEventRepo = outboxEventRepo;
-        this.forwardedTemplate = forwardedTemplate;
-        this.completedTemplate = completedTemplate;
     }
 
     /**
@@ -142,33 +127,36 @@ public class TransactionService {
      * CONSUMER: transactions.processed
      * Bank B skickar response → Clearing-service
      */
-
-    // TODO: Implement Outbox like above 
     @Transactional
-    public ResponseEntity<?> handleProcessedTransaction(TransactionResponseEvent event) {
+    public void handleProcessedTransaction(TransactionResponseEvent event) {
 
-        log.info("Clearing-service received TransactionResponseEvent for {}", event.getTransactionId());
+        Optional<OutgoingTransaction> existing = outgoingRepo.findById(event.getTransactionId());
+        if (!existing.isPresent()) {
+            return;
+        }
 
-        // 1. Uppdatera incoming-transaction internt
-        incomingRepo.findByTransactionId(event.getTransactionId()).ifPresent(incoming -> {
-            incoming.setStatus(event.getStatus());
-            incomingRepo.save(incoming);
-        });
+        OutgoingTransaction transaction = existing.get();
+        transaction.setStatus(event.getStatus());
+        outgoingRepo.save(transaction);
 
-        // 2. Hämta outgoing transaktionen för att veta vilken bank som ska få svaret
-        outgoingRepo.findByTransactionId(event.getTransactionId()).ifPresent(outgoing -> {
-            if (completedTemplate != null) {
-                completedTemplate.send(
+        try {
+            // Check for duplicate transcationId/topic combination
+            boolean alreadyExists = outboxEventRepo.existsByTransactionIdAndTopic(
+                    event.getTransactionId(), TOPIC_COMPLETED);
+
+            if (!alreadyExists) {
+                String payload = objectMapper.writeValueAsString(event);
+                OutboxEvent outboxEvent = new OutboxEvent(
+                        event.getTransactionId(),
                         TOPIC_COMPLETED,
-                        outgoing.getFromClearingNumber(),
-                        event);
-
-
-                log.info("PROCESSED -> COMPLETED: " + event.toString());
+                        transaction.getFromClearingNumber(),
+                        payload);
+                outboxEventRepo.save(outboxEvent);
             }
-        });
-
-        return ResponseEntity.ok("Processed transaction response forwarded successfully");
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize event to JSON for transaction {}", event.getTransactionId(), e);
+            throw new RuntimeException("Failed to process transaction", e);
+        }
     }
 
     public ResponseEntity<?> getOutgoingTransactionById(UUID transactionId) {
