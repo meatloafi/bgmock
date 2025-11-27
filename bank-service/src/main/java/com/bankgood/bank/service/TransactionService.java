@@ -34,7 +34,6 @@ public class TransactionService {
     private final IncomingTransactionRepository incomingRepo;
     AccountService accountService;
 
-
     private final KafkaTemplate<String, OutgoingTransactionEvent> initiatedTemplate;
     private final KafkaTemplate<String, TransactionResponseEvent> processedTemplate;
 

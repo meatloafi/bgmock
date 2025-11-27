@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -38,8 +39,12 @@ public class AccountService {
         account.setAccountId(dto.getAccountId());
         account.setAccountNumber(dto.getAccountNumber());
         account.setAccountHolder(dto.getAccountHolder());
+
         account.setBalance(dto.getBalance() != null ? dto.getBalance() : BigDecimal.ZERO);
         account.setReservedBalance(dto.getReservedBalance() != null ? dto.getReservedBalance() : BigDecimal.ZERO);
+        account.setCreatedAt(dto.getCreatedAt() != null ? dto.getCreatedAt() : LocalDateTime.now());
+        account.setUpdatedAt(dto.getUpdatedAt() != null ? dto.getUpdatedAt() : LocalDateTime.now());
+
         return account;
     }
 
