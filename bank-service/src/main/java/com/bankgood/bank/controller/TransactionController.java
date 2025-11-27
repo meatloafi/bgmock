@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -22,7 +23,14 @@ public class TransactionController {
     // ===================== OUTGOING =====================
     @PostMapping("/outgoing")
     public ResponseEntity<?> createOutgoing(@RequestBody OutgoingTransactionEvent event) {
-        return service.createOutgoingTransaction(event);
+        try {
+            service.createOutgoingTransaction(event);
+            return ResponseEntity.accepted().body(Map.of(
+                    "message", "Transaction accepted for initiation",
+                    "transactionId", event.getTransactionId()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 
     @GetMapping("/outgoing/{id}")

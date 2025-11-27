@@ -43,6 +43,11 @@ public class KafkaConfig {
     }
 
     @Bean
+    public KafkaTemplate<String, Object> kafkaTemplate() {
+        return new KafkaTemplate<>(producerFactory());
+    }
+
+    @Bean
     public KafkaTemplate<String, OutgoingTransactionEvent> outgoingTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
