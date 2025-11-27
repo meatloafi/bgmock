@@ -52,4 +52,11 @@ public class Account {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    public Account(String accountNumber, String accountHolder, BigDecimal balance) {
+        this.accountNumber = accountNumber;
+        this.accountHolder = accountHolder;
+        this.balance = balance;
+        reservedBalance = BigDecimal.ZERO;
+    }
 }
