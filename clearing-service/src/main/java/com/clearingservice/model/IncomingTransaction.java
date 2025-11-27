@@ -34,7 +34,7 @@ public class IncomingTransaction {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private TransactionStatus status; // PENDING, SUCCESS, FAILED
+    private TransactionStatus status = TransactionStatus.PENDING; // PENDING, SUCCESS, FAILED
 
     @CreationTimestamp
     @Column(nullable = false)

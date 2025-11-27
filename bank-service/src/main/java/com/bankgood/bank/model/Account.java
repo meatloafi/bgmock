@@ -36,11 +36,11 @@ public class Account {
 
     @Column(nullable = false)
     @DecimalMin(value = "0.0", message = "Balance cannot be negative")
-    private BigDecimal balance;
+    private BigDecimal balance = BigDecimal.ZERO;
 
     @Column(nullable = false)
     @DecimalMin(value = "0.0", message = "ReservedBalance cannot be negative")
-    private BigDecimal reservedBalance;
+    private BigDecimal reservedBalance = BigDecimal.ZERO;
 
     // Uses optimistic locking to prevent race conditions when two requests tries to
     // access the same account at the same time
@@ -57,6 +57,5 @@ public class Account {
         this.accountNumber = accountNumber;
         this.accountHolder = accountHolder;
         this.balance = balance;
-        reservedBalance = BigDecimal.ZERO;
     }
 }

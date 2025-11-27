@@ -1,15 +1,13 @@
 package com.bankgood.bank.controller;
 
-import com.bankgood.bank.event.OutgoingTransactionEvent;
 import com.bankgood.bank.event.IncomingTransactionEvent;
-import com.bankgood.bank.model.IncomingTransaction;
-import com.bankgood.bank.model.OutgoingTransaction;
+import com.bankgood.bank.event.OutgoingTransactionEvent;
+import com.bankgood.bank.event.TransactionResponseEvent;
 import com.bankgood.bank.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List ;
 import java.util.UUID;
 
 @RestController
@@ -30,16 +28,6 @@ public class TransactionController {
         return service.getOutgoingTransaction(id);
     }
 
-    @GetMapping("/outgoing")
-    public ResponseEntity<List<OutgoingTransaction>> getAllOutgoing() {
-        return service.getAllOutgoingTransactions();
-    }
-
-    @PutMapping("/outgoing/{id}")
-    public ResponseEntity<?> updateOutgoing(@PathVariable UUID id, @RequestBody OutgoingTransactionEvent event) {
-        return service.updateOutgoingTransaction(id, event);
-    }
-
     @DeleteMapping("/outgoing/{id}")
     public ResponseEntity<?> deleteOutgoing(@PathVariable UUID id) {
         return service.deleteOutgoingTransaction(id);
@@ -56,30 +44,20 @@ public class TransactionController {
         return service.getIncomingTransaction(id);
     }
 
-    @GetMapping("/incoming")
-    public ResponseEntity<List<IncomingTransaction>> getAllIncoming() {
-        return service.getAllIncomingTransactions();
-    }
-
-    @PutMapping("/incoming/{id}")
-    public ResponseEntity<?> updateIncoming(@PathVariable UUID id, @RequestBody IncomingTransactionEvent event) {
-        return service.updateIncomingTransaction(id, event);
-    }
-
     @DeleteMapping("/incoming/{id}")
     public ResponseEntity<?> deleteIncoming(@PathVariable UUID id) {
         return service.deleteIncomingTransaction(id);
     }
 
-    // ===================== ACCOUNT =====================
-
-    @GetMapping("/outgoing/account/{accountId}")
-    public ResponseEntity<?> getOutgoingByAccount(@PathVariable UUID accountId) {
-        return service.getOutgoingTransactionsByAccount(accountId);
+    // ===================== TRANSACTION EVENTS =====================
+    // Endpoints för att simulera inkommande events (valfritt om Kafka används)
+    @PostMapping("/incoming/event")
+    public void handleIncomingEvent(@RequestBody IncomingTransactionEvent event) {
+        service.handleIncomingTransaction(event);
     }
 
-    @GetMapping("/incoming/account/{accountId}")
-    public ResponseEntity<?> getIncomingByAccount(@PathVariable UUID accountId) {
-        return service.getIncomingTransactionsByAccount(accountId);
+    @PostMapping("/outgoing/completed")
+    public void handleCompletedEvent(@RequestBody TransactionResponseEvent event) {
+        service.handleCompletedTransaction(event);
     }
 }

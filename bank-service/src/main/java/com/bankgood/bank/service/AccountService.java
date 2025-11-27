@@ -51,7 +51,6 @@ public class AccountService {
     @Transactional
     public AccountDTO createAccount(AccountDTO dto) {
         Account account = toEntity(dto);
-        account.setBalance(account.getBalance() == null ? BigDecimal.ZERO : account.getBalance());
         Account saved = accountRepository.save(account);
         return toDTO(saved);
     }
