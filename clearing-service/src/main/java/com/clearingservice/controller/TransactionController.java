@@ -35,7 +35,15 @@ public class TransactionController {
     // Endpoint för att simulera att en bank skickar processed-response (för test)
     @PostMapping("/processed")
     public ResponseEntity<?> handleProcessedTransaction(@RequestBody TransactionResponseEvent event) {
-        return transactionService.handleProcessedTransaction(event);
+        try {
+            transactionService.handleProcessedTransaction(event);
+            return ResponseEntity.accepted().body(Map.of(
+                    "message", "Transaction accepted for completion",
+                    "transactionId", event.getTransactionId()));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+
+        }
     }
 
     // ===================== FETCH TRANSACTION =====================
