@@ -51,7 +51,7 @@ public class TransactionController {
 
     // ===================== TRANSACTION EVENTS =====================
     // Endpoints för att simulera inkommande events (valfritt om Kafka används)
-    @PostMapping("/incoming/event")
+    @PostMapping("/incoming")
     public void handleIncomingEvent(@RequestBody IncomingTransactionEvent event) {
         service.handleIncomingTransaction(event);
     }
