@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/clearing/transactions")
+@RequestMapping("/clearing/transaction")
 public class TransactionController {
 
     private final TransactionService transactionService;

@@ -3,6 +3,8 @@ package com.bankgood.bank.kafka;
 import com.bankgood.bank.event.IncomingTransactionEvent;
 import com.bankgood.bank.event.TransactionResponseEvent;
 import com.bankgood.bank.service.TransactionService;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -11,8 +13,8 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "kafka.enabled", havingValue = "true", matchIfMissing = true)
 public class TransactionEventListener {
 
-    // @Value("${spring.kafka.consumer.group-id}")
-    // private String groupId;
+    @Value("${BANK_CLEARING_NUMBER}")
+    private String clearingNumber;
 
     private final TransactionService transactionService;
 
@@ -23,7 +25,7 @@ public class TransactionEventListener {
     // (1) Bank tar emot transaktion från clearing → ska behandla den
     @KafkaListener(
             topics = "transactions.forwarded",
-            groupId = "bank-service-forwarded",
+            groupId = "${SPRING_KAFKA_CONSUMER_GROUP_ID_FORWARDED}",
             containerFactory = "incomingListenerFactory"
     )
     public void listenIncoming(IncomingTransactionEvent event) {
@@ -34,7 +36,7 @@ public class TransactionEventListener {
     // (2) Bank tar emot respons för en outgoing transaktion
     @KafkaListener(
             topics = "transactions.completed",
-            groupId = "bank-service-completed",
+            groupId = "${SPRING_KAFKA_CONSUMER_GROUP_ID_COMPLETED}",
             containerFactory = "responseListenerFactory"
     )
     public void listenCompleted(TransactionResponseEvent event) {

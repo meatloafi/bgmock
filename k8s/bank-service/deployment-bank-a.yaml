@@ -42,7 +42,11 @@ spec:
             - name: SPRING_APPLICATION_NAME
               value: "bank-a-service"
             - name: BANK_CLEARING_NUMBER
-              value: "000001"
+              value: "01"
+            - name: SPRING_KAFKA_CONSUMER_GROUP_ID_FORWARDED
+              value: "bank-service-forwarded.${BANK_CLEARING_NUMBER}"
+            - name: SPRING_KAFKA_CONSUMER_GROUP_ID_COMPLETED
+              value: "bank-service-completed.${BANK_CLEARING_NUMBER}"
 
             # Kafka config
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS

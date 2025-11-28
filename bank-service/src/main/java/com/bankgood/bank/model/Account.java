@@ -26,7 +26,6 @@ public class Account {
     @Column(unique = true, updatable = false, nullable = false)
     private UUID accountId;
 
-
     @Column(unique = true, nullable = false)
     @NotBlank(message = "Account number is required")
     private String accountNumber;
@@ -36,9 +35,12 @@ public class Account {
     private String accountHolder;
 
     @Column(nullable = false)
-    @DecimalMin(value = "0.0", inclusive = true, message = "Balance cannot be negative")
-    private BigDecimal balance;
+    @DecimalMin(value = "0.0", message = "Balance cannot be negative")
+    private BigDecimal balance = BigDecimal.ZERO;
 
+    @Column(nullable = false)
+    @DecimalMin(value = "0.0", message = "ReservedBalance cannot be negative")
+    private BigDecimal reservedBalance = BigDecimal.ZERO;
 
     // Uses optimistic locking to prevent race conditions when two requests tries to
     // access the same account at the same time
@@ -50,4 +52,10 @@ public class Account {
 
     @UpdateTimestamp
     private LocalDateTime updatedAt;
+
+    public Account(String accountNumber, String accountHolder, BigDecimal balance) {
+        this.accountNumber = accountNumber;
+        this.accountHolder = accountHolder;
+        this.balance = balance;
+    }
 }
