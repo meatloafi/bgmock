@@ -30,8 +30,7 @@ public class AccountService {
                 account.getBalance(),
                 account.getReservedBalance(),
                 account.getCreatedAt(),
-                account.getUpdatedAt()
-        );
+                account.getUpdatedAt());
     }
 
     public Account toEntity(AccountDTO dto) {
@@ -60,12 +59,6 @@ public class AccountService {
         return toDTO(saved);
     }
 
-    public AccountDTO getAccount(UUID accountId) {
-        Account account = accountRepository.findById(accountId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
-        return toDTO(account);
-    }
-
     public AccountDTO getAccountByNumber(String accountNumber) {
         Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
@@ -84,8 +77,8 @@ public class AccountService {
     }
 
     @Transactional
-    public AccountDTO updateAccount(UUID accountId, AccountDTO dto) {
-        Account existing = accountRepository.findById(accountId)
+    public AccountDTO updateAccount(String accountNumber, AccountDTO dto) {
+        Account existing = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
 
         if (dto.getBalance() == null || dto.getBalance().compareTo(BigDecimal.ZERO) < 0) {
@@ -99,8 +92,8 @@ public class AccountService {
     }
 
     @Transactional
-    public void deleteAccount(UUID accountId) {
-        Account existing = accountRepository.findById(accountId)
+    public void deleteAccount(String accountNumber) {
+        Account existing = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
         accountRepository.delete(existing);
     }
@@ -111,16 +104,17 @@ public class AccountService {
      * Deposits a positive amount into the specified account.
      *
      * @param accountId the UUID of the account
-     * @param amount the amount to deposit (must be positive)
+     * @param amount    the amount to deposit (must be positive)
      * @return the updated AccountDTO
-     * @throws ResponseStatusException if the account is not found or the amount is non-positive
+     * @throws ResponseStatusException if the account is not found or the amount is
+     *                                 non-positive
      */
     @Transactional
-    public AccountDTO deposit(UUID accountId, BigDecimal amount) {
+    public AccountDTO deposit(String accountNumber, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Deposit amount must be positive");
 
-        Account account = accountRepository.findById(accountId)
+        Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
 
         account.setBalance(account.getBalance().add(amount));
@@ -132,16 +126,18 @@ public class AccountService {
      * The reserved amount is locked for a pending transaction.
      *
      * @param accountId the UUID of the account
-     * @param amount the amount to reserve (must be positive and <= available balance)
+     * @param amount    the amount to reserve (must be positive and <= available
+     *                  balance)
      * @return the updated AccountDTO
-     * @throws ResponseStatusException if the account is not found, the amount is non-positive, or insufficient funds
+     * @throws ResponseStatusException if the account is not found, the amount is
+     *                                 non-positive, or insufficient funds
      */
     @Transactional
-    public AccountDTO reserveFunds(UUID accountId, BigDecimal amount) {
+    public AccountDTO reserveFunds(String accountNumber, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Amount must be positive");
 
-        Account account = accountRepository.findById(accountId)
+        Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
 
         BigDecimal available = account.getBalance().subtract(account.getReservedBalance());
@@ -158,16 +154,18 @@ public class AccountService {
      * Should be called when the transaction is confirmed/settled.
      *
      * @param accountId the UUID of the account
-     * @param amount the amount to commit (must be positive and <= reserved balance)
+     * @param amount    the amount to commit (must be positive and <= reserved
+     *                  balance)
      * @return the updated AccountDTO
-     * @throws ResponseStatusException if the account is not found, the amount is non-positive, or insufficient reserved funds
+     * @throws ResponseStatusException if the account is not found, the amount is
+     *                                 non-positive, or insufficient reserved funds
      */
     @Transactional
-    public AccountDTO commitReservedFunds(UUID accountId, BigDecimal amount) {
+    public AccountDTO commitReservedFunds(String accountNumber, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Amount must be positive");
 
-        Account account = accountRepository.findById(accountId)
+        Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
 
         if (account.getReservedBalance().compareTo(amount) < 0)
@@ -184,23 +182,25 @@ public class AccountService {
      * Should be called when the transaction is cancelled or fails.
      *
      * @param accountId the UUID of the account
-     * @param amount the amount to release (must be positive and <= reserved balance)
+     * @param amount    the amount to release (must be positive and <= reserved
+     *                  balance)
      * @return the updated AccountDTO
-     * @throws ResponseStatusException if the account is not found, the amount is non-positive, or insufficient reserved funds
+     * @throws ResponseStatusException if the account is not found, the amount is
+     *                                 non-positive, or insufficient reserved funds
      */
     @Transactional
-    public AccountDTO releaseReservedFunds(UUID accountId, BigDecimal amount) {
+    public AccountDTO releaseReservedFunds(String accountNumber, BigDecimal amount) {
         if (amount.compareTo(BigDecimal.ZERO) <= 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Amount must be positive");
 
-        Account account = accountRepository.findById(accountId)
+        Account account = accountRepository.findByAccountNumber(accountNumber)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
 
         if (account.getReservedBalance().compareTo(amount) < 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Not enough reserved funds to release");
 
         account.setReservedBalance(account.getReservedBalance().subtract(amount));
-
+        
         return toDTO(account);
     }
 

@@ -67,7 +67,7 @@ public class TransactionService {
         // TODO: Idempotency check
         try {
             // 1. Reservera pengar via AccountService
-            accountService.reserveFunds(event.getFromAccountId(), event.getAmount());
+            accountService.reserveFunds(event.getFromAccountNumber(), event.getAmount());
 
             // 2. Skapa transaktion
             OutgoingTransaction transaction = new OutgoingTransaction(
@@ -242,7 +242,7 @@ public class TransactionService {
 
             // Hämta konto och gör deposit
             AccountDTO toAccount = accountService.getAccountByNumber(event.getToAccountNumber());
-            accountService.deposit(toAccount.getAccountId(), event.getAmount());
+            accountService.deposit(toAccount.getAccountNumber(), event.getAmount());
 
             // Lyckad transaktion
             finalStatus = TransactionStatus.SUCCESS;
@@ -287,29 +287,32 @@ public class TransactionService {
     // ===================== OUTGOING RESPONSE: CONSUME completed
     // =====================
 
-    @Transactional
-    public void handleCompletedTransaction(TransactionResponseEvent event) {
-        outgoingRepo.findByTransactionId(event.getTransactionId()).ifPresent(tx -> {
-            tx.setStatus(event.getStatus());
-            outgoingRepo.save(tx);
+ @Transactional
+public void handleCompletedTransaction(TransactionResponseEvent event) {
+    OutgoingTransaction tx = outgoingRepo.findByTransactionId(event.getTransactionId())
+            .orElse(null);
 
-            try {
-                if (event.getStatus() == TransactionStatus.SUCCESS) {
-                    // Commita reserverade pengar
-                    accountService.commitReservedFunds(tx.getFromAccountId(), tx.getAmount());
-                } else {
-                    // Släpp reserverade pengar
-                    accountService.releaseReservedFunds(tx.getFromAccountId(), tx.getAmount());
-                }
-            } catch (Exception e) {
-                log.error("Failed to update account balances for transaction {}: {}", tx.getTransactionId(),
-                        e.getMessage());
-                // Eventuellt sätta transaktionen som FAILED om den inte redan är det
-                if (tx.getStatus() != TransactionStatus.FAILED) {
-                    tx.setStatus(TransactionStatus.FAILED);
-                    outgoingRepo.save(tx);
-                }
-            }
-        });
+    if (tx == null) {
+        log.warn("Transaction {} not found", event.getTransactionId());
+        return;
     }
+
+    tx.setStatus(event.getStatus());
+
+    try {
+        if (event.getStatus() == TransactionStatus.SUCCESS) {
+            accountService.commitReservedFunds(tx.getFromAccountNumber(), tx.getAmount());
+            log.info("Committed funds");
+        } else {
+            accountService.releaseReservedFunds(tx.getFromAccountNumber(), tx.getAmount());
+            log.info("Released funds");
+        }
+    } catch (Exception e) {
+        log.error("Failed to update account balances for transaction {}: {}", tx.getTransactionId(),
+                e.getMessage());
+        tx.setStatus(TransactionStatus.FAILED);
+        throw new RuntimeException("Failed to update accounts", e); // force rollback
+    }
+}
+
 }
