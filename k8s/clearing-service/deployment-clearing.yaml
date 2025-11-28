@@ -59,14 +59,20 @@ spec:
             - name: SPRING_KAFKA_CONSUMER_VALUE_DESERIALIZER
               value: "org.apache.kafka.common.serialization.StringDeserializer"
             
-            # Kafka tuning
-            - name: SPRING_KAFKA_CONSUMER_SESSION_TIMEOUT_MS
-              value: "60000"  # Increased from default 10s to 60s
-            - name: SPRING_KAFKA_CONSUMER_HEARTBEAT_INTERVAL_MS
-              value: "10000"  # Increased from default 3s to 10s
-            - name: SPRING_KAFKA_CONSUMER_MAX_POLL_INTERVAL_MS
-              value: "300000"  # 5 minutes
 
+            # Logging overrides
+            - name: LOGGING_LEVEL_ROOT
+              value: "INFO"
+            - name: LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_KAFKA
+              value: "WARN"
+            - name: LOGGING_LEVEL_ORG_APACHE_KAFKA
+              value: "WARN"
+            - name: LOGGING_LEVEL_ORG_APACHE_KAFKA_CLIENTS_CONSUMER_INTERNALS
+              value: "WARN"
+            - name: LOGGING_LEVEL_ORG_APACHE_KAFKA_CLIENTS_PRODUCER_INTERNALS
+              value: "WARN"
+            - name: LOGGING_LEVEL_COM_BANKGOOD_BANK
+              value: "INFO"
 
           livenessProbe:
             httpGet:

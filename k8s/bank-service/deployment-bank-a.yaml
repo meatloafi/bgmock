@@ -43,6 +43,10 @@ spec:
               value: "bank-a-service"
             - name: BANK_CLEARING_NUMBER
               value: "01"
+            - name: SPRING_KAFKA_CONSUMER_GROUP_ID_FORWARDED
+              value: "bank-service-forwarded.${BANK_CLEARING_NUMBER}"
+            - name: SPRING_KAFKA_CONSUMER_GROUP_ID_COMPLETED
+              value: "bank-service-completed.${BANK_CLEARING_NUMBER}"
 
             # Kafka config
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS
@@ -56,6 +60,20 @@ spec:
             - name: SPRING_KAFKA_CONSUMER_VALUE_DESERIALIZER
               value: "org.apache.kafka.common.serialization.StringDeserializer"
 
+            # Logging overrides
+            - name: LOGGING_LEVEL_ROOT
+              value: "INFO"
+            - name: LOGGING_LEVEL_ORG_SPRINGFRAMEWORK_KAFKA
+              value: "WARN"
+            - name: LOGGING_LEVEL_ORG_APACHE_KAFKA
+              value: "WARN"
+            - name: LOGGING_LEVEL_ORG_APACHE_KAFKA_CLIENTS_CONSUMER_INTERNALS
+              value: "WARN"
+            - name: LOGGING_LEVEL_ORG_APACHE_KAFKA_CLIENTS_PRODUCER_INTERNALS
+              value: "WARN"
+            - name: LOGGING_LEVEL_COM_BANKGOOD_BANK
+              value: "INFO"
+              
           livenessProbe:
             httpGet:
               path: /bank/health

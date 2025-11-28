@@ -3,6 +3,9 @@ package com.bankgood.bank.config;
 import com.bankgood.bank.event.IncomingTransactionEvent;
 import com.bankgood.bank.event.OutgoingTransactionEvent;
 import com.bankgood.bank.event.TransactionResponseEvent;
+
+import lombok.extern.slf4j.Slf4j;
+
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -20,6 +23,7 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 import java.util.HashMap;
 import java.util.Map;
 
+@Slf4j
 @EnableKafka
 @Configuration
 @ConditionalOnProperty(name = "kafka.enabled", havingValue = "true", matchIfMissing = true)
@@ -28,9 +32,11 @@ public class KafkaConfig {
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
+    @Value("${BANK_CLEARING_NUMBER}")
+    private String clearingNumber;
+
     // @Value("${spring.kafka.consumer.group-id}")
     // private String groupId;
-
 
     // ===================== PRODUCER =====================
 
@@ -43,6 +49,11 @@ public class KafkaConfig {
     }
 
     @Bean
+    public KafkaTemplate<String, Object> kafkaTemplate() {
+        return new KafkaTemplate<>(producerFactory());
+    }
+
+    @Bean
     public KafkaTemplate<String, OutgoingTransactionEvent> outgoingTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
@@ -51,7 +62,6 @@ public class KafkaConfig {
     public KafkaTemplate<String, TransactionResponseEvent> responseTemplate() {
         return new KafkaTemplate<>(producerFactory());
     }
-
 
     // ===================== CONSUMER =====================
 
@@ -68,24 +78,34 @@ public class KafkaConfig {
         return new DefaultKafkaConsumerFactory<>(
                 config,
                 new StringDeserializer(),
-                jsonDeserializer
-        );
+                jsonDeserializer);
     }
-
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, IncomingTransactionEvent> incomingListenerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, IncomingTransactionEvent> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
+        ConcurrentKafkaListenerContainerFactory<String, IncomingTransactionEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory(IncomingTransactionEvent.class));
+
+        factory.setRecordFilterStrategy(record -> {
+            String key = record.key();
+            log.info("Received key '{}', expected clearing '{}'", record.key(), clearingNumber);
+
+            return !(clearingNumber.equals(key));
+        });
         return factory;
     }
 
     @Bean
     public ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> responseListenerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> factory =
-                new ConcurrentKafkaListenerContainerFactory<>();
+        ConcurrentKafkaListenerContainerFactory<String, TransactionResponseEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory(TransactionResponseEvent.class));
+
+        factory.setRecordFilterStrategy(record -> {
+            String key = record.key();
+            log.info("Received key '{}', expected clearing '{}'", record.key(), clearingNumber);
+
+            return !(clearingNumber.equals(key));
+        });
         return factory;
     }
 

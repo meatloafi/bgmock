@@ -1,4 +1,4 @@
-package com.clearingservice.service;
+package com.bankgood.bank.service;
 
 import java.util.List;
 
@@ -6,12 +6,12 @@ import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import com.clearingservice.model.OutboxEvent;
-import com.clearingservice.repository.OutboxEventRepository;
+import com.bankgood.bank.model.OutboxEvent;
+import com.bankgood.bank.repository.OutboxEventRepository;
 
 import lombok.extern.slf4j.Slf4j;
-import com.clearingservice.event.IncomingTransactionEvent;
-import com.clearingservice.event.TransactionResponseEvent;
+import com.bankgood.bank.event.OutgoingTransactionEvent;
+import com.bankgood.bank.event.TransactionResponseEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Component
@@ -40,10 +40,10 @@ public class OutboxEventPublisher {
 
                 // Convert payload from string to correct event object
                 switch (event.getTopic()) {
-                    case "transactions.forwarded":
-                        payloadObj = objectMapper.readValue(event.getPayload(), IncomingTransactionEvent.class);
+                    case "transactions.initiated":
+                        payloadObj = objectMapper.readValue(event.getPayload(), OutgoingTransactionEvent.class);
                         break;
-                    case "transactions.completed":
+                    case "transactions.processed":
                         payloadObj = objectMapper.readValue(event.getPayload(), TransactionResponseEvent.class);
                         break;
                     default:

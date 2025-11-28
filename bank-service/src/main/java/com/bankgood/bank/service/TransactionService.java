@@ -5,10 +5,15 @@ import com.bankgood.bank.event.IncomingTransactionEvent;
 import com.bankgood.bank.event.OutgoingTransactionEvent;
 import com.bankgood.bank.event.TransactionResponseEvent;
 import com.bankgood.bank.model.IncomingTransaction;
+import com.bankgood.bank.model.OutboxEvent;
 import com.bankgood.bank.model.OutgoingTransaction;
 import com.bankgood.bank.model.TransactionStatus;
 import com.bankgood.bank.repository.IncomingTransactionRepository;
+import com.bankgood.bank.repository.OutboxEventRepository;
 import com.bankgood.bank.repository.OutgoingTransactionRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -30,27 +35,36 @@ public class TransactionService {
     private static final String TOPIC_INITIATED = "transactions.initiated";
     private static final String TOPIC_PROCESSED = "transactions.processed";
 
+    private final ObjectMapper objectMapper;
     private final OutgoingTransactionRepository outgoingRepo;
     private final IncomingTransactionRepository incomingRepo;
-    AccountService accountService;
+    private final AccountService accountService;
+    private final OutboxEventRepository outboxEventRepo;
 
     private final KafkaTemplate<String, OutgoingTransactionEvent> initiatedTemplate;
     private final KafkaTemplate<String, TransactionResponseEvent> processedTemplate;
 
-    public TransactionService(OutgoingTransactionRepository outgoingRepo,
-                              IncomingTransactionRepository incomingRepo,
-                              AccountService accountService,
-                              KafkaTemplate<String, OutgoingTransactionEvent> initiatedTemplate,
-                              KafkaTemplate<String, TransactionResponseEvent> processedTemplate) {
+    public TransactionService(
+            ObjectMapper objectMapper,
+            OutgoingTransactionRepository outgoingRepo,
+            IncomingTransactionRepository incomingRepo,
+            AccountService accountService,
+            OutboxEventRepository outboxEventRepo,
+            KafkaTemplate<String, OutgoingTransactionEvent> initiatedTemplate,
+            KafkaTemplate<String, TransactionResponseEvent> processedTemplate) {
+        this.objectMapper = objectMapper;
         this.outgoingRepo = outgoingRepo;
         this.incomingRepo = incomingRepo;
         this.accountService = accountService;
+        this.outboxEventRepo = outboxEventRepo;
         this.initiatedTemplate = initiatedTemplate;
-        this.processedTemplate = processedTemplate; }
+        this.processedTemplate = processedTemplate;
+    }
 
     // ===================== OUTGOING =====================
     @Transactional
-    public ResponseEntity<?> createOutgoingTransaction(OutgoingTransactionEvent event) {
+    public void createOutgoingTransaction(OutgoingTransactionEvent event) {
+        // TODO: Idempotency check
         try {
             // 1. Reservera pengar via AccountService
             accountService.reserveFunds(event.getFromAccountId(), event.getAmount());
@@ -61,8 +75,7 @@ public class TransactionService {
                     fromClearingNumber,
                     event.getFromAccountNumber(),
                     event.getToBankgoodNumber(),
-                    event.getAmount()
-            );
+                    event.getAmount());
             OutgoingTransaction saved = outgoingRepo.save(transaction);
 
             event.setTransactionId(saved.getTransactionId());
@@ -72,13 +85,25 @@ public class TransactionService {
             event.setFromClearingNumber(fromClearingNumber);
 
             sendOutgoingTransaction(event); // Kafka
+
+            String payload = objectMapper.writeValueAsString(event);
+
+            OutboxEvent outboxEvent = new OutboxEvent(
+                    event.getTransactionId(),
+                    TOPIC_INITIATED,
+                    fromClearingNumber,
+                    payload);
+            outboxEventRepo.save(outboxEvent);
+            // sendOutgoingTransaction(event);
+            log.info("Initiated transaction with ID: " + event.getTransactionId());
+
             log.info("INITIATED: " + event);
 
-            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
-
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize event to JSON for transaction {}", event.getTransactionId(), e);
+            throw new RuntimeException("Failed to process transaction", e);
         } catch (Exception e) {
             log.error("Failed to create outgoing transaction", e);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Failed to create outgoing transaction");
         }
     }
 
@@ -98,7 +123,6 @@ public class TransactionService {
     }
 
     // ===================== INCOMING =====================
-
     public ResponseEntity<?> getIncomingTransaction(UUID id) {
         return incomingRepo.findById(id)
                 .map(ResponseEntity::ok)
@@ -117,17 +141,89 @@ public class TransactionService {
     // ===================== OUTGOING: PRODUCE initiated =====================
 
     public void sendOutgoingTransaction(OutgoingTransactionEvent event) {
-        log.info("Producing OutgoingTransactionEvent → transactions.initiated");
         initiatedTemplate.send(TOPIC_INITIATED, event);
     }
 
-    // ===================== INCOMING: CONSUME forwarded =====================
+    /**
+     * CONSUMER: transactions.forwarded
+     * Bank sends response to Clearing-service
+     */
+    // @Transactional
+    // public void handleIncomingTransaction(IncomingTransactionEvent event) {
+    //     log.info("Received transaction with ID: ", event.getTransactionId());
+
+    //     // 1. Spara incoming transaktionen
+    //     IncomingTransaction transaction = new IncomingTransaction(
+    //             event.getTransactionId(),
+    //             event.getToClearingNumber(),
+    //             event.getToAccountNumber(),
+    //             event.getAmount(),
+    //             event.getStatus(),
+    //             event.getCreatedAt(),
+    //             LocalDateTime.now());
+
+    //     try {
+    //         // Spara incoming transaktionen
+    //         incomingRepo.save(transaction);
+
+    //         // Hämta konto och gör deposit
+    //         AccountDTO toAccount = accountService.getAccountByNumber(event.getToAccountNumber());
+    //         accountService.deposit(toAccount.getAccountId(), event.getAmount());
+
+    //         // Lyckad transaktion
+    //         transaction.setStatus(TransactionStatus.SUCCESS);
+    //         incomingRepo.save(transaction);
+
+    //         TransactionResponseEvent response = new TransactionResponseEvent(
+    //                 event.getTransactionId(),
+    //                 TransactionStatus.SUCCESS,
+    //                 "Transaction processed");
+
+    //         boolean alreadyExists = outboxEventRepo.existsByTransactionIdAndTopic(
+    //                 event.getTransactionId(), TOPIC_PROCESSED);
+
+    //         if (!alreadyExists) {
+    //             String payload = objectMapper.writeValueAsString(response);
+    //             OutboxEvent outboxEvent = new OutboxEvent(
+    //                     event.getTransactionId(),
+    //                     TOPIC_PROCESSED,
+    //                     fromClearingNumber,
+    //                     payload);
+    //             outboxEventRepo.save(outboxEvent);
+
+    //             log.info("Processed transaction with ID: " + event.getTransactionId());
+    //         }
+
+    //     } catch (JsonProcessingException e) {
+    //         log.error("Failed to serialize event to JSON for transaction {}", event.getTransactionId(), e);
+    //         throw new RuntimeException("Failed to process transaction", e);
+    //     } catch (Exception e) {
+    //         log.error("Failed to process incoming transaction", e);
+
+    //         // Sätt transaktionen som FAILED
+    //         transaction.setStatus(TransactionStatus.FAILED);
+    //         incomingRepo.save(transaction);
+    //         TransactionResponseEvent response = new TransactionResponseEvent(
+    //                 event.getTransactionId(),
+    //                 TransactionStatus.FAILED,
+    //                 "Transaction failed: " + e.getMessage());
+
+    //         String payload = objectMapper.writeValueAsString(response);
+    //         OutboxEvent outboxEvent = new OutboxEvent(
+    //                 event.getTransactionId(),
+    //                 TOPIC_PROCESSED,
+    //                 fromClearingNumber,
+    //                 payload);
+    //         outboxEventRepo.save(outboxEvent);
+
+    //         log.info("Processed transaction with ID: " + event.getTransactionId());
+    //     }
+    // }
 
     @Transactional
     public void handleIncomingTransaction(IncomingTransactionEvent event) {
-        log.info("Received IncomingTransactionEvent for account {}", event.getToAccountNumber());
+        log.info("Received transaction with ID: {}", event.getTransactionId());
 
-        // 1. Spara incoming transaktionen
         IncomingTransaction transaction = new IncomingTransaction(
                 event.getTransactionId(),
                 event.getToClearingNumber(),
@@ -135,8 +231,10 @@ public class TransactionService {
                 event.getAmount(),
                 event.getStatus(),
                 event.getCreatedAt(),
-                LocalDateTime.now()
-        );
+                LocalDateTime.now());
+
+        TransactionStatus finalStatus;
+        String message;
 
         try {
             // Spara incoming transaktionen
@@ -147,29 +245,38 @@ public class TransactionService {
             accountService.deposit(toAccount.getAccountId(), event.getAmount());
 
             // Lyckad transaktion
-            transaction.setStatus(TransactionStatus.SUCCESS);
-            incomingRepo.save(transaction);
-
-            sendProcessedResponse(new TransactionResponseEvent(
-                    event.getTransactionId(),
-                    TransactionStatus.SUCCESS,
-                    "Transaction processed"
-            ));
-
+            finalStatus = TransactionStatus.SUCCESS;
+            message = "Transaction processed";
         } catch (Exception e) {
-            log.error("Failed to process incoming transaction", e);
+            log.error("Failed to process incoming transaction {}", event.getTransactionId(), e);
 
-            // Sätt transaktionen som FAILED
-            transaction.setStatus(TransactionStatus.FAILED);
-            incomingRepo.save(transaction);
-
-            // Skicka FAILED-response till clearing
-            sendProcessedResponse(new TransactionResponseEvent(
-                    event.getTransactionId(),
-                    TransactionStatus.FAILED,
-                    "Transaction failed: " + e.getMessage()
-            ));
+            finalStatus = TransactionStatus.FAILED;
+            message = "Transaction failed: " + e.getMessage();
         }
+
+        // Uppdatera transaction status
+        transaction.setStatus(finalStatus);
+        incomingRepo.save(transaction);
+
+        // Skapa outbox event om det inte redan finns
+        try {
+            boolean alreadyExists = outboxEventRepo.existsByTransactionIdAndTopic(event.getTransactionId(),
+                    TOPIC_PROCESSED);
+            if (!alreadyExists) {
+                TransactionResponseEvent response = new TransactionResponseEvent(event.getTransactionId(), finalStatus,
+                        message);
+                String payload = objectMapper.writeValueAsString(response);
+                OutboxEvent outboxEvent = new OutboxEvent(event.getTransactionId(), TOPIC_PROCESSED, fromClearingNumber,
+                        payload);
+                outboxEventRepo.save(outboxEvent);
+            }
+        } catch (JsonProcessingException ex) {
+            log.error("Failed to serialize event to JSON for transaction {}", event.getTransactionId(), ex);
+            throw new RuntimeException("Failed to process transaction outbox event", ex);
+        }
+
+        log.info("Processed transaction with ID: {}", event.getTransactionId());
+
     }
 
     public void sendProcessedResponse(TransactionResponseEvent event) {
@@ -177,7 +284,8 @@ public class TransactionService {
         processedTemplate.send(TOPIC_PROCESSED, event);
     }
 
-    // ===================== OUTGOING RESPONSE: CONSUME completed =====================
+    // ===================== OUTGOING RESPONSE: CONSUME completed
+    // =====================
 
     @Transactional
     public void handleCompletedTransaction(TransactionResponseEvent event) {
@@ -194,7 +302,8 @@ public class TransactionService {
                     accountService.releaseReservedFunds(tx.getFromAccountId(), tx.getAmount());
                 }
             } catch (Exception e) {
-                log.error("Failed to update account balances for transaction {}: {}", tx.getTransactionId(), e.getMessage());
+                log.error("Failed to update account balances for transaction {}: {}", tx.getTransactionId(),
+                        e.getMessage());
                 // Eventuellt sätta transaktionen som FAILED om den inte redan är det
                 if (tx.getStatus() != TransactionStatus.FAILED) {
                     tx.setStatus(TransactionStatus.FAILED);
