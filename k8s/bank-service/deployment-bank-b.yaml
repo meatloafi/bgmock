@@ -42,7 +42,7 @@ spec:
             - name: SPRING_APPLICATION_NAME
               value: "bank-b-service"
             - name: BANK_CLEARING_NUMBER
-              value: "000002"
+              value: "02"
             - name: SPRING_KAFKA_CONSUMER_GROUP_ID_FORWARDED
               value: "bank-service-forwarded.${BANK_CLEARING_NUMBER}"
             - name: SPRING_KAFKA_CONSUMER_GROUP_ID_COMPLETED
