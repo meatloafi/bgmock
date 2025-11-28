@@ -71,7 +71,6 @@ public class TransactionService {
 
             // 2. Skapa transaktion
             OutgoingTransaction transaction = new OutgoingTransaction(
-                    event.getFromAccountId(),
                     fromClearingNumber,
                     event.getFromAccountNumber(),
                     event.getToBankgoodNumber(),

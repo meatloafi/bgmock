@@ -25,9 +25,6 @@ public class OutgoingTransaction {
     private UUID transactionId;
 
     @Column(nullable = false)
-    private UUID fromAccountId;
-
-    @Column(nullable = false)
     private String fromClearingNumber;
 
     @Column(nullable = false)
@@ -51,9 +48,8 @@ public class OutgoingTransaction {
     @Column(nullable = false)
     private LocalDateTime updatedAt = this.createdAt;
 
-    public OutgoingTransaction(UUID fromAccountId, String fromClearingNumber, String fromAccountNumber,
+    public OutgoingTransaction(String fromClearingNumber, String fromAccountNumber,
                                String toBankgoodNumber, BigDecimal amount) {
-        this.fromAccountId = fromAccountId;
         this.fromClearingNumber = fromClearingNumber;
         this.fromAccountNumber = fromAccountNumber;
         this.toBankgoodNumber = toBankgoodNumber;
