@@ -58,7 +58,7 @@ public class OutboxEventPublisher {
                 event.setPublished(true);
                 outboxEventRepo.save(event);
 
-                log.info("Published outbox event with transaction ID: {}", event.getTransactionId());
+                log.info("Published outbox event with transaction ID: {} to clearing number: {}", event.getTransactionId(), event.getMessageKey());
 
             } catch (Exception e) {
                 log.error("Failed to publish outbox event id={}", event.getId(), e);
