@@ -34,10 +34,6 @@ public class TransactionController {
     }
 
     // ===================== INCOMING =====================
-    @PostMapping("/incoming")
-    public ResponseEntity<?> createIncoming(@RequestBody IncomingTransactionEvent event) {
-        return service.createIncomingTransaction(event);
-    }
 
     @GetMapping("/incoming/{id}")
     public ResponseEntity<?> getIncoming(@PathVariable UUID id) {
@@ -50,7 +46,6 @@ public class TransactionController {
     }
 
     // ===================== TRANSACTION EVENTS =====================
-    // Endpoints för att simulera inkommande events (valfritt om Kafka används)
     @PostMapping("/incoming")
     public void handleIncomingEvent(@RequestBody IncomingTransactionEvent event) {
         service.handleIncomingTransaction(event);

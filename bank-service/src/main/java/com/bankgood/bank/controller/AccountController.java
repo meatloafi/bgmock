@@ -37,6 +37,14 @@ public class AccountController {
         return ResponseEntity.ok(result);
     }
 
+    @GetMapping("/{accountNumber}")
+    public ResponseEntity<AccountDTO> getAccountByNumber(@PathVariable String accountNumber) {
+        log.info("API CALL: Get account with account number {}", accountNumber);
+        AccountDTO result = accountService.getAccountByNumber(accountNumber);
+        log.info("API RESULT: Get account response {}", result);
+        return ResponseEntity.ok(result);
+    }
+
     @GetMapping
     public ResponseEntity<List<AccountDTO>> getAllAccounts() {
         log.info("API CALL: Get all accounts");

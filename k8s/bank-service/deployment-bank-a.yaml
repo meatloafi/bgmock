@@ -42,7 +42,7 @@ spec:
             - name: SPRING_APPLICATION_NAME
               value: "bank-a-service"
             - name: BANK_CLEARING_NUMBER
-              value: "000001"
+              value: "01"
 
             # Kafka config
             - name: SPRING_KAFKA_BOOTSTRAP_SERVERS

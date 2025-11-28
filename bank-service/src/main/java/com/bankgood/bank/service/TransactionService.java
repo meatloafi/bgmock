@@ -98,22 +98,6 @@ public class TransactionService {
     }
 
     // ===================== INCOMING =====================
-    @Transactional
-    public ResponseEntity<?> createIncomingTransaction(IncomingTransactionEvent event) {
-        try {
-            IncomingTransaction transaction = new IncomingTransaction(
-                    event.getToClearingNumber(),
-                    event.getToAccountNumber(),
-                    event.getAmount()
-            );
-            transaction.setStatus(event.getStatus());
-            IncomingTransaction saved = incomingRepo.save(transaction);
-            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
-        } catch (Exception e) {
-            log.error("Failed to create incoming transaction", e);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Failed to create incoming transaction");
-        }
-    }
 
     public ResponseEntity<?> getIncomingTransaction(UUID id) {
         return incomingRepo.findById(id)
@@ -153,14 +137,13 @@ public class TransactionService {
                 event.getCreatedAt(),
                 LocalDateTime.now()
         );
-        incomingRepo.save(transaction);
 
         try {
             // Spara incoming transaktionen
             incomingRepo.save(transaction);
 
             // Hämta konto och gör deposit
-            AccountDTO toAccount = accountService.getAccount(event.getToAccountNumber());
+            AccountDTO toAccount = accountService.getAccountByNumber(event.getToAccountNumber());
             accountService.deposit(toAccount.getAccountId(), event.getAmount());
 
             // Lyckad transaktion
