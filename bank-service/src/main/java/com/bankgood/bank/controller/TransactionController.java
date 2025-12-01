@@ -42,7 +42,6 @@ public class TransactionController {
     }
 
     // ===================== INCOMING =====================
-
     @GetMapping("/incoming/{id}")
     public ResponseEntity<?> getIncoming(@PathVariable UUID id) {
         return service.getIncomingTransaction(id);

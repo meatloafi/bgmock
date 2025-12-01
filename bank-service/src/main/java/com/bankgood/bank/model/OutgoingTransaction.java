@@ -15,8 +15,6 @@ import lombok.*;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Setter
-@Getter
 public class OutgoingTransaction {
 
     @Id
@@ -42,11 +40,11 @@ public class OutgoingTransaction {
 
     @CreationTimestamp
     @Column(nullable = false)
-    private final LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(nullable = false)
-    private LocalDateTime updatedAt = this.createdAt;
+    private LocalDateTime updatedAt;
 
     public OutgoingTransaction(String fromClearingNumber, String fromAccountNumber,
                                String toBankgoodNumber, BigDecimal amount) {

@@ -1,6 +1,7 @@
 package com.bankgood.bank.controller;
 
 import com.bankgood.bank.event.AccountDTO;
+import com.bankgood.bank.event.ReserveFundsResult;
 import com.bankgood.bank.service.AccountService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -72,11 +73,11 @@ public class AccountController {
     }
 
     @PostMapping("/{id}/reserve")
-    public ResponseEntity<AccountDTO> reserveFunds(
+    public ResponseEntity<ReserveFundsResult> reserveFunds(
             @PathVariable String accountNumber,
             @RequestParam BigDecimal amount) {
         log.info("API CALL: Reserve {} on account {}", amount, accountNumber);
-        AccountDTO result = accountService.reserveFunds(accountNumber, amount);
+        ReserveFundsResult result = accountService.reserveFunds(accountNumber, amount);
         log.info("API RESULT: After reserve: {}", result);
         return ResponseEntity.ok(result);
     }

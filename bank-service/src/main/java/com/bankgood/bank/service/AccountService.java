@@ -1,6 +1,7 @@
 package com.bankgood.bank.service;
 
 import com.bankgood.bank.event.AccountDTO;
+import com.bankgood.bank.event.ReserveFundsResult;
 import com.bankgood.bank.model.Account;
 import com.bankgood.bank.repository.AccountRepository;
 import lombok.RequiredArgsConstructor;
@@ -125,29 +126,30 @@ public class AccountService {
      * Reserves a specified amount from the available balance of the account.
      * The reserved amount is locked for a pending transaction.
      *
-     * @param accountId the UUID of the account
+     * @param accountNumber the account number
      * @param amount    the amount to reserve (must be positive and <= available
      *                  balance)
      * @return the updated AccountDTO
      * @throws ResponseStatusException if the account is not found, the amount is
      *                                 non-positive, or insufficient funds
      */
-    @Transactional
-    public AccountDTO reserveFunds(String accountNumber, BigDecimal amount) {
-        if (amount.compareTo(BigDecimal.ZERO) <= 0)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Amount must be positive");
-
-        Account account = accountRepository.findByAccountNumber(accountNumber)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Account not found"));
-
-        BigDecimal available = account.getBalance().subtract(account.getReservedBalance());
-        if (available.compareTo(amount) < 0)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Insufficient available funds");
-
-        account.setReservedBalance(account.getReservedBalance().add(amount));
-
-        return toDTO(account);
+@Transactional
+public ReserveFundsResult reserveFunds(String accountNumber, BigDecimal amount) {
+    Account account = accountRepository.findByAccountNumber(accountNumber).orElse(null);
+    if (account == null) {
+        return new ReserveFundsResult(false, "Account not found", null);
     }
+
+    BigDecimal available = account.getBalance().subtract(account.getReservedBalance());
+    if (available.compareTo(amount) < 0) {
+        return new ReserveFundsResult(false,
+            "Insufficient funds: requested " + amount + ", available " + available,
+            toDTO(account));
+    }
+
+    account.setReservedBalance(account.getReservedBalance().add(amount));
+    return new ReserveFundsResult(true, "Funds reserved", toDTO(account));
+}
 
     /**
      * Commits a previously reserved amount, deducting it from the total balance.
