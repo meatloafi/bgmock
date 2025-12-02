@@ -9,8 +9,14 @@
 ## Start Local Cluster
 ```bash
 minikube start
-
 eval $(minikube docker-env)
+```
+---
+
+## Install Strimzi
+```bash
+kubectl create namespace kafka
+kubectl create -f 'https://strimzi.io/install/latest?namespace=kafka' -n kafka
 ```
 ---
 
