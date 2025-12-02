@@ -15,7 +15,6 @@ import java.util.UUID;
 @Getter
 public class OutgoingTransactionEvent {
     private UUID transactionId;
-    private UUID fromAccountId;
     private String fromClearingNumber;
     private String fromAccountNumber;
     private String toBankgoodNumber;

@@ -15,17 +15,12 @@ import lombok.*;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Setter
-@Getter
 public class OutgoingTransaction {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(unique = true, updatable = false, nullable = false)
     private UUID transactionId;
-
-    @Column(nullable = false)
-    private UUID fromAccountId;
 
     @Column(nullable = false)
     private String fromClearingNumber;
@@ -45,15 +40,14 @@ public class OutgoingTransaction {
 
     @CreationTimestamp
     @Column(nullable = false)
-    private final LocalDateTime createdAt = LocalDateTime.now();
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(nullable = false)
-    private LocalDateTime updatedAt = this.createdAt;
+    private LocalDateTime updatedAt;
 
-    public OutgoingTransaction(UUID fromAccountId, String fromClearingNumber, String fromAccountNumber,
+    public OutgoingTransaction(String fromClearingNumber, String fromAccountNumber,
                                String toBankgoodNumber, BigDecimal amount) {
-        this.fromAccountId = fromAccountId;
         this.fromClearingNumber = fromClearingNumber;
         this.fromAccountNumber = fromAccountNumber;
         this.toBankgoodNumber = toBankgoodNumber;

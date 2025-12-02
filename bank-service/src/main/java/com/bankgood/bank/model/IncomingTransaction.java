@@ -15,12 +15,9 @@ import lombok.*;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Setter
-@Getter
 public class IncomingTransaction {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(unique = true, updatable = false, nullable = false)
     private UUID transactionId;
 
@@ -45,9 +42,12 @@ public class IncomingTransaction {
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    public IncomingTransaction(String toClearingNumber, String toAccountNumber, BigDecimal amount) {
+    public IncomingTransaction(UUID transactionId, String toClearingNumber, String toAccountNumber,
+            BigDecimal amount, TransactionStatus status) {
+        this.transactionId = transactionId;
         this.toClearingNumber = toClearingNumber;
         this.toAccountNumber = toAccountNumber;
         this.amount = amount;
+        this.status = status;
     }
 }

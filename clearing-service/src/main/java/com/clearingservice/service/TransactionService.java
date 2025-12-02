@@ -62,7 +62,6 @@ public class TransactionService {
 
         OutgoingTransaction outgoing = new OutgoingTransaction(
                 event.getTransactionId(),
-                event.getFromAccountId(),
                 event.getFromClearingNumber(),
                 event.getFromAccountNumber(),
                 event.getToBankgoodNumber(),
