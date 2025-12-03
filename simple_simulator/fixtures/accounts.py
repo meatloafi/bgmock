@@ -9,8 +9,17 @@ class AccountFixture:
         self.log = logger
 
     def __enter__(self):
-        self.setup()
-        return self  # so you can access it inside `with` if needed
+        try:
+            self.setup()
+        except Exception as e:
+            self.log(f"Setup failed: {e}. Running cleanup...")
+            try:
+                self.cleanup()
+            except Exception as cleanup_err:
+                self.log(f"Cleanup during setup failure also failed: {cleanup_err}")
+            raise 
+        return self
+
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.cleanup()

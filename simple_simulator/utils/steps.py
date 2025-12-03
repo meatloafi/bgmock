@@ -66,3 +66,28 @@ class WaitTransactionsStep:
                 return False
             self.log(f"✅ Transaction {idx} completed")
         return True
+
+class DeploymentScaleStep:
+    def __init__(self, deployment_name: str, namespace: str, log_fn=print):
+        self.k8s = K8sManager()
+        self.deployment_name = deployment_name
+        self.namespace = namespace
+        self.log = log_fn
+
+    def scale_down(self):
+        self.log(f"Scaling down deployment '{self.deployment_name}'...")
+        self.k8s.scale_deployment(self.deployment_name, self.namespace, 0)
+        self.log(f"Waiting for deployment '{self.deployment_name}' to fully scale down...")
+        if not self.k8s.wait_for_deployment_scaled_down(self.deployment_name, self.namespace):
+            return False
+        return True
+
+    def scale_up(self, replicas: int = 1):
+        self.log(f"Scaling up deployment '{self.deployment_name}' to {replicas} replicas...")
+        self.k8s.scale_deployment(self.deployment_name, self.namespace, replicas)
+
+        self.log(f"Waiting for deployment '{self.deployment_name}' ready...")
+        if not self.k8s.wait_for_deployment_ready(self.deployment_name, self.namespace):
+            return False
+        time.sleep(5)
+        return True

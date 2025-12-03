@@ -8,8 +8,9 @@ metadata:
   namespace: default
 
 ---
+
 # ------------------------------
-# Role in Kafka Namespace (for scaling StatefulSets)
+# Role in Kafka Namespace (for scaling StatefulSets and Kafka NodePools)
 # ------------------------------
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
@@ -20,53 +21,6 @@ rules:
 - apiGroups: ["apps"]
   resources: ["statefulsets", "statefulsets/scale"]
   verbs: ["get", "list", "patch", "update"]
-- apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["get", "list", "watch"]
-
----
-# ------------------------------
-# RoleBinding to connect SA -> Role (Kafka Namespace)
-# ------------------------------
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: simulator-kafka-scaler-binding
-  namespace: kafka
-subjects:
-- kind: ServiceAccount
-  name: simulator-sa
-  namespace: default
-roleRef:
-  kind: Role
-  name: kafka-scaler
-  apiGroup: rbac.authorization.k8s.io
-
----
-# ------------------------------
-# Role in Default Namespace (if simulator needs to query other resources)
-# ------------------------------
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: simulator-reader
-  namespace: default
-rules:
-- apiGroups: [""]
-  resources: ["pods"]
-  verbs: ["get", "list", "watch"]
-- apiGroups: ["apps"]
-  resources: ["deployments", "statefulsets"]
-  verbs: ["get", "list"]
-
----
-
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: kafka-scaler
-  namespace: kafka
-rules:
 - apiGroups: ["kafka.strimzi.io"]
   resources: ["kafkanodepools"]
   verbs: ["get", "list", "patch", "update"]
@@ -75,6 +29,10 @@ rules:
   verbs: ["get", "list", "watch"]
 
 ---
+
+# ------------------------------
+# RoleBinding to connect SA -> Kafka Role
+# ------------------------------
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -89,14 +47,33 @@ roleRef:
   name: kafka-scaler
   apiGroup: rbac.authorization.k8s.io
 
-  
+---
+
+# ------------------------------
+# Role in Default Namespace (for reading and scaling deployments)
+# ------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: simulator-default-scaler
+  namespace: default
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments", "deployments/scale"]
+  verbs: ["get", "list", "patch", "update"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+
+---
+
 # ------------------------------
 # RoleBinding for Default Namespace
 # ------------------------------
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: simulator-reader-binding
+  name: simulator-default-scaler-binding
   namespace: default
 subjects:
 - kind: ServiceAccount
@@ -104,10 +81,11 @@ subjects:
   namespace: default
 roleRef:
   kind: Role
-  name: simulator-reader
+  name: simulator-default-scaler
   apiGroup: rbac.authorization.k8s.io
 
 ---
+
 # ------------------------------
 # Simulator Job
 # ------------------------------

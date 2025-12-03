@@ -16,7 +16,7 @@ The simulator is a Kubernetes Job and needs to be triggered to run. The easiest 
 From root folder, run: 
 
 ```bash
-kubectl delete job simulator-job
+kubectl delete job simulator-job # If it exists already
 kubectl apply -f k8s/simulator/simulator.yaml
 
 # Check logs 

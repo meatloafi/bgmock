@@ -18,6 +18,7 @@ def main():
     logger.info("=" * 60)
     logger.info("Starting Banking Simulation")
     logger.info("=" * 60)
+    time.sleep(7)
     
     passed = 0
     failed = 0
@@ -40,7 +41,7 @@ def main():
             logger.exception(f"✗ {scenario.name} CRASHED: {e}")
             failed += 1
         
-        time.sleep(1)  # Brief pause between scenarios
+        time.sleep(3)  # Brief pause between scenarios
     
     # Summary
     logger.info("=" * 60)
