@@ -47,21 +47,20 @@ public class OutboxEventPublisher {
                         payloadObj = objectMapper.readValue(event.getPayload(), TransactionResponseEvent.class);
                         break;
                     default:
-                        log.warn("Unknown topic {} for OutboxEvent id={}", event.getTopic(), event.getId());
+                        log.warn("Unknown topic {} for OutboxEvent ID: {}", event.getTopic(), event.getId());
                         continue; 
                 }
 
                 // Send to Kafka
                 kafkaTemplate.send(event.getTopic(), event.getMessageKey(), payloadObj).get();
-                log.info(payloadObj.toString());
                 // Mark as published only after successful send
                 event.setPublished(true);
                 outboxEventRepo.save(event);
 
-                log.info("Published outbox event with transaction ID: {} to clearing number: {}", event.getTransactionId(), event.getMessageKey());
+                log.info("Published outbox event with transaction ID: {}", event.getTransactionId());
 
             } catch (Exception e) {
-                log.error("Failed to publish outbox event id={}", event.getId(), e);
+                log.error("Failed to publish outbox event ID: {}", event.getId(), e);
             }
         }
     }

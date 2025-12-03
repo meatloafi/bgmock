@@ -5,13 +5,17 @@
 - [Docker](https://www.docker.com/)  
 - [kubectl](https://kubernetes.io/docs/tasks/tools/)  
 - [Strimzi](https://strimzi.io/quickstarts/)
----
 ## Start Local Cluster
 ```bash
 minikube start
 eval $(minikube docker-env)
 ```
----
+
+## Install Strimzi
+```bash
+kubectl create namespace kafka
+kubectl create -f 'https://strimzi.io/install/latest?namespace=kafka' -n kafka
+```
 
 ## Install Strimzi
 ```bash
@@ -25,7 +29,6 @@ kubectl create -f 'https://strimzi.io/install/latest?namespace=kafka' -n kafka
 docker build -t bank-service:latest bank-service
 docker build -t clearing-service:latest clearing-service
 ```
----
 
 ## Deploy infrastructure
 ```bash 
@@ -36,14 +39,12 @@ kubectl apply -f k8s/kafka/   # Kafka operator
 kubectl get pods
 kubectl get pods -n kafka
 ```
----
 
 ## Deploy services
 ```bash 
 kubectl apply -f k8s/clearing-service/
 kubectl apply -f k8s/bank-service/
 ```
----
 
 ## Updating Deployment with new docker image 
 ```bash 
@@ -54,8 +55,21 @@ docker build -t clearing-service:latest clearing-service
 kubectl rollout restart deployment clearing-service
 kubectl rollout status deployment clearing-service
 ```
+## Running simulator
 
----
+```bash
+eval $(minikube docker-env)
+docker build -t simulator:latest simple_simulator/
+```
+
+```bash
+kubectl delete job simulator-job # If it exists already
+kubectl apply -f k8s/simulator/simulator.yaml
+
+# Check logs 
+kubectl logs -f job/simulator-job
+```
+
 ## Testing endpoints
 
 1. Port forward service 
@@ -81,7 +95,6 @@ curl -X POST http://localhost:8080/api/transactions \
       }'
 ```
 
---- 
 ## Testing Locally Without Kafka
 
 To test the service locally without Kafka, you can disable Kafka bean creation by adding the following to your `application.properties`:

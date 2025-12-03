@@ -88,7 +88,6 @@ public class KafkaConfig {
 
         factory.setRecordFilterStrategy(record -> {
             String key = record.key();
-            log.info("Received key '{}', expected clearing '{}'", record.key(), clearingNumber);
 
             return !(clearingNumber.equals(key));
         });
@@ -102,7 +101,6 @@ public class KafkaConfig {
 
         factory.setRecordFilterStrategy(record -> {
             String key = record.key();
-            log.info("Received key '{}', expected clearing '{}'", record.key(), clearingNumber);
 
             return !(clearingNumber.equals(key));
         });

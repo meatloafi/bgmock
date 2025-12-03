@@ -1,0 +1,117 @@
+# ------------------------------
+# Service Account for Simulator
+# ------------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: simulator-sa
+  namespace: default
+
+---
+
+# ------------------------------
+# Role in Kafka Namespace (for scaling StatefulSets and Kafka NodePools)
+# ------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kafka-scaler
+  namespace: kafka
+rules:
+- apiGroups: ["apps"]
+  resources: ["statefulsets", "statefulsets/scale"]
+  verbs: ["get", "list", "patch", "update"]
+- apiGroups: ["kafka.strimzi.io"]
+  resources: ["kafkanodepools"]
+  verbs: ["get", "list", "patch", "update"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+
+---
+
+# ------------------------------
+# RoleBinding to connect SA -> Kafka Role
+# ------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: simulator-kafka-scaler-binding
+  namespace: kafka
+subjects:
+- kind: ServiceAccount
+  name: simulator-sa
+  namespace: default
+roleRef:
+  kind: Role
+  name: kafka-scaler
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+# ------------------------------
+# Role in Default Namespace (for reading and scaling deployments)
+# ------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: simulator-default-scaler
+  namespace: default
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments", "deployments/scale"]
+  verbs: ["get", "list", "patch", "update"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+
+---
+
+# ------------------------------
+# RoleBinding for Default Namespace
+# ------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: simulator-default-scaler-binding
+  namespace: default
+subjects:
+- kind: ServiceAccount
+  name: simulator-sa
+  namespace: default
+roleRef:
+  kind: Role
+  name: simulator-default-scaler
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+# ------------------------------
+# Simulator Job
+# ------------------------------
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: simulator-job
+  labels:
+    app: simulator
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: simulator
+    spec:
+      serviceAccountName: simulator-sa
+      restartPolicy: Never
+      containers:
+        - name: simulator
+          image: simulator:latest
+          imagePullPolicy: Never
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

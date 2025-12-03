@@ -12,7 +12,6 @@ import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.util.List;
-import java.util.UUID;
 
 @Slf4j
 @RestController
@@ -46,7 +45,7 @@ public class AccountController {
         return ResponseEntity.ok(result);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/{accountNumber}")
     public ResponseEntity<AccountDTO> updateAccount(@PathVariable String accountNumber, @Valid @RequestBody AccountDTO dto) {
         log.info("API CALL: Update account {} with data {}", accountNumber, dto);
         AccountDTO result = accountService.updateAccount(accountNumber, dto);
@@ -54,7 +53,7 @@ public class AccountController {
         return ResponseEntity.ok(result);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/{accountNumber}")
     public ResponseEntity<Void> deleteAccount(@PathVariable String accountNumber) {
         log.info("API CALL: Delete account {}", accountNumber);
         accountService.deleteAccount(accountNumber);
@@ -62,7 +61,7 @@ public class AccountController {
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/{id}/deposit")
+    @PostMapping("/{accountNumber}/deposit")
     public ResponseEntity<AccountDTO> deposit(
             @PathVariable String accountNumber,
             @RequestParam BigDecimal amount) {
@@ -72,7 +71,7 @@ public class AccountController {
         return ResponseEntity.ok(result);
     }
 
-    @PostMapping("/{id}/reserve")
+    @PostMapping("/{accountNumber}/reserve")
     public ResponseEntity<ReserveFundsResult> reserveFunds(
             @PathVariable String accountNumber,
             @RequestParam BigDecimal amount) {
@@ -82,7 +81,7 @@ public class AccountController {
         return ResponseEntity.ok(result);
     }
 
-    @PostMapping("/{id}/commit")
+    @PostMapping("/{accountNumber}/commit")
     public ResponseEntity<AccountDTO> commitReservedFunds(
             @PathVariable String accountNumber,
             @RequestParam BigDecimal amount) {
@@ -92,7 +91,7 @@ public class AccountController {
         return ResponseEntity.ok(result);
     }
 
-    @PostMapping("/{id}/release")
+    @PostMapping("/{accountNumber}/release")
     public ResponseEntity<AccountDTO> releaseReservedFunds(
             @PathVariable String accountNumber,
             @RequestParam BigDecimal amount) {

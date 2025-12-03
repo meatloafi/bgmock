@@ -123,12 +123,8 @@ public class TransactionService {
         event.setUpdatedAt(saved.getUpdatedAt());
         event.setFromClearingNumber(fromClearingNumber);
 
-        try {
-            saveOutboxEvent(event.getTransactionId(), TOPIC_INITIATED, event);
-            log.info("Initiated transaction with ID: {}", event.getTransactionId());
-        } catch (Exception e) {
-            log.error("Failed to send outgoing transaction", e);
-        }
+        saveOutboxEvent(event.getTransactionId(), TOPIC_INITIATED, event);
+        log.info("Initiated transaction with ID: {}", event.getTransactionId());
     }
 
 
