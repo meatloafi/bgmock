@@ -1,5 +1,5 @@
 from decimal import Decimal
-from k8s_utils import K8sManager
+from utils.k8s_utils import K8sManager
 import time
 
 class KafkaOutageStep:

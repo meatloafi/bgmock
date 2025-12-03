@@ -18,4 +18,7 @@ From root folder, run:
 ```bash
 kubectl delete job simulator-job
 kubectl apply -f k8s/simulator/simulator.yaml
+
+# Check logs 
+kubectl logs -f job/simulator-job
 ```
