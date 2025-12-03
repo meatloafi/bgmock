@@ -41,7 +41,7 @@ class BankTestClient:
 
         return {}, response.status_code
 
-    def wait_for_transaction(self, transaction_id: str, timeout: int = 30, poll_interval: float = 1.0):
+    def wait_for_transaction(self, transaction_id: str, timeout: int = 30, poll_interval: float = 3.0):
         """
         Poll the transaction status until it's no longer PENDING, or timeout is reached.
         Returns the final transaction info and status code.

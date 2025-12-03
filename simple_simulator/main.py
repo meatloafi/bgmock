@@ -47,9 +47,7 @@ def main():
     logger.info(f"Results: {passed} passed, {failed} failed")
     logger.info("=" * 60)
     
-    # Keep container alive
-    while True:
-        time.sleep(1)
+
 
 if __name__ == "__main__":
     main()
