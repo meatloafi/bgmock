@@ -93,6 +93,14 @@ public class TransactionService {
      */
     @Transactional
     public void createOutgoingTransaction(OutgoingTransactionEvent event) {
+
+        // Idempotency check
+        if (event.getTransactionId() != null &&
+                outgoingRepo.existsById(event.getTransactionId())) {
+            log.info("Transaction {} already exists, skipping", event.getTransactionId());
+            return;
+        }
+
         OutgoingTransaction transaction = new OutgoingTransaction(
                 fromClearingNumber,
                 event.getFromAccountNumber(),
@@ -127,8 +135,6 @@ public class TransactionService {
         log.info("Initiated transaction with ID: {}", event.getTransactionId());
     }
 
-
-
     /**
      * CONSUMER: transactions.forwarded
      * Bank sends response to Clearing-service
@@ -137,6 +143,12 @@ public class TransactionService {
     public void handleIncomingTransaction(IncomingTransactionEvent event) {
         log.info("Received transaction with ID: {}", event.getTransactionId());
 
+        // Idempotency check
+        boolean alreadyProcessed = incomingRepo.existsById(event.getTransactionId());
+        if (alreadyProcessed) {
+            log.info("Transaction {} already processed, skipping", event.getTransactionId());
+            return;
+        }
         IncomingTransaction transaction = new IncomingTransaction(
                 event.getTransactionId(),
                 event.getToClearingNumber(),
@@ -148,10 +160,8 @@ public class TransactionService {
         String message;
 
         try {
-            // Spara incoming transaktionen
             incomingRepo.save(transaction);
 
-            // Hämta konto och gör deposit
             AccountDTO toAccount = accountService.getAccountByNumber(event.getToAccountNumber());
             accountService.deposit(toAccount.getAccountNumber(), event.getAmount());
 
@@ -165,21 +175,17 @@ public class TransactionService {
             message = "Transaction failed: " + e.getMessage();
         }
 
-        // Uppdatera transaction status
         transaction.setStatus(finalStatus);
         incomingRepo.save(transaction);
 
-        // Skapa outbox event om det inte redan finns
-        boolean alreadyExists = outboxEventRepo.existsByTransactionIdAndTopic(event.getTransactionId(),
-                TOPIC_PROCESSED);
-        if (!alreadyExists) {
-            TransactionResponseEvent response = new TransactionResponseEvent(event.getTransactionId(), finalStatus,
-                    message);
-            saveOutboxEvent(event.getTransactionId(), TOPIC_PROCESSED, response);
-        }
+        TransactionResponseEvent response = new TransactionResponseEvent(
+                event.getTransactionId(),
+                finalStatus,
+                message);
+        saveOutboxEvent(event.getTransactionId(), TOPIC_PROCESSED, response);
+
         log.info("Processed transaction with ID: {}", event.getTransactionId());
     }
-
 
     /**
      * CONSUMER: transactions.completed
@@ -192,6 +198,14 @@ public class TransactionService {
 
         if (tx == null) {
             log.warn("Transaction {} not found", event.getTransactionId());
+            return;
+        }
+
+        // Idempotency check: If transaction already has FAILED/SUCCESS then we have
+        // already completed the payment
+        if (tx.getStatus() == TransactionStatus.SUCCESS || tx.getStatus() == TransactionStatus.FAILED) {
+            log.info("Transaction {} already processed with status {}, skipping",
+                    event.getTransactionId(), tx.getStatus());
             return;
         }
 
@@ -215,7 +229,7 @@ public class TransactionService {
 
     // ====== Helpers ======
 
-        private void failTransaction(OutgoingTransaction transaction, OutgoingTransactionEvent event, String reason) {
+    private void failTransaction(OutgoingTransaction transaction, OutgoingTransactionEvent event, String reason) {
         log.info("Cannot create transaction: {}", reason);
         transaction.setStatus(TransactionStatus.FAILED);
         // optional: transaction.setFailureReason(reason);

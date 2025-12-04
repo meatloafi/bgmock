@@ -48,12 +48,9 @@ kubectl apply -f k8s/bank-service/
 
 ## Updating Deployment with new docker image 
 ```bash 
-# Rebuild image
-docker build -t clearing-service:latest clearing-service
-
-# Apply changes
-kubectl rollout restart deployment clearing-service
-kubectl rollout status deployment clearing-service
+kubectl rollout restart deployment bankgood-bank-a
+kubectl rollout restart deployment bankgood-bank-b
+kubectl rollout restart deployment bankgood-clearing
 ```
 ## Running simulator
 
