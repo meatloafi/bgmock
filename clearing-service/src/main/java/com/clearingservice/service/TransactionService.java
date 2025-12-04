@@ -15,12 +15,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
 
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -47,78 +45,90 @@ public class TransactionService {
         this.outboxEventRepo = outboxEventRepo;
     }
 
-    /**
-     * CONSUMER: transactions.initiated
-     * Bank A skickar TransactionOutgoingEvent → Clearing-service
-     */
     @Transactional
     public void handleOutgoingTransaction(OutgoingTransactionEvent event) {
+        log.info("Processing outgoing transaction {}", event.getTransactionId());
 
-        Optional<OutgoingTransaction> existing = outgoingRepo.findById(event.getTransactionId());
-        if (existing.isPresent()) {
-            log.warn("Transaction {} already exists", event.getTransactionId());
+        // Idempotency check
+        if (outgoingRepo.existsById(event.getTransactionId())) {
+            log.info("Transaction {} already processed, skipping", event.getTransactionId());
             return;
         }
 
+        // Lookup bank mapping first (before committing to anything)
+        Optional<BankMapping> mappingOpt = mappingRepo.findByBankgoodNumber(event.getToBankgoodNumber());
+
+        if (mappingOpt.isEmpty()) {
+            handleFailedRoute(event);
+            return;
+        }
+
+        handleSuccessfulRoute(event, mappingOpt.get());
+    }
+
+    @Transactional
+    private void handleFailedRoute(OutgoingTransactionEvent event) {
+        log.warn("No bank-mapping found for {}", event.getToBankgoodNumber());
+
+        // Save the outgoing transaction with FAILED status
         OutgoingTransaction outgoing = new OutgoingTransaction(
                 event.getTransactionId(),
                 event.getFromClearingNumber(),
                 event.getFromAccountNumber(),
                 event.getToBankgoodNumber(),
                 event.getAmount(),
-                event.getStatus(),
+                TransactionStatus.FAILED,
                 event.getCreatedAt(),
                 event.getUpdatedAt());
-        try {
-            outgoingRepo.save(outgoing);
-        } catch (DataIntegrityViolationException e) {
-            log.info("Transaction {} already processed", event.getTransactionId());
-            return;
-        }
+        outgoingRepo.save(outgoing);
 
-        Optional<BankMapping> mappingOpt = mappingRepo.findByBankgoodNumber(event.getToBankgoodNumber());
+        // Send failure response back to originating bank
+        TransactionResponseEvent failedResponse = new TransactionResponseEvent();
+        failedResponse.setTransactionId(event.getTransactionId());
+        failedResponse.setStatus(TransactionStatus.FAILED);
+        failedResponse.setMessage("No bank-mapping found for " + event.getToBankgoodNumber());
 
-        try {
-            if (mappingOpt.isEmpty()) {
-                TransactionResponseEvent failedResponse = new TransactionResponseEvent();
-                failedResponse.setTransactionId(event.getTransactionId());
-                failedResponse.setStatus(TransactionStatus.FAILED);
-                failedResponse.setMessage("No bank-mapping found for " + event.getToBankgoodNumber());
+        saveOutboxEvent(
+                event.getTransactionId(),
+                TOPIC_COMPLETED,
+                failedResponse,
+                event.getFromClearingNumber());
 
-                String payload = objectMapper.writeValueAsString(failedResponse);
-                OutboxEvent outboxEvent = new OutboxEvent(
-                        event.getTransactionId(),
-                        TOPIC_COMPLETED,
-                        event.getFromClearingNumber(),
-                        payload);
-                outboxEventRepo.save(outboxEvent);
-                log.info("Rejected transaction with ID {}. Reason: {}", failedResponse.getTransactionId(), failedResponse.getMessage());
+        log.info("Rejected transaction {} - no routing available", event.getTransactionId());
+    }
 
-            } else {
-                BankMapping mapping = mappingOpt.get();
-                IncomingTransactionEvent incomingEvent = new IncomingTransactionEvent(
-                        event.getTransactionId(),
-                        mapping.getClearingNumber(),
-                        mapping.getAccountNumber(),
-                        event.getAmount(),
-                        TransactionStatus.PENDING,
-                        event.getCreatedAt(),
-                        LocalDateTime.now());
+    @Transactional
+    private void handleSuccessfulRoute(OutgoingTransactionEvent event, BankMapping mapping) {
+        log.info("Routing transaction {} to bank {}", event.getTransactionId(), mapping.getClearingNumber());
 
-                String payload = objectMapper.writeValueAsString(incomingEvent);
-                OutboxEvent outboxEvent = new OutboxEvent(
-                        event.getTransactionId(),
-                        TOPIC_FORWARDED,
-                        mapping.getClearingNumber(),
-                        payload);
-                outboxEventRepo.save(outboxEvent);
+        // Save the outgoing transaction with PENDING status
+        OutgoingTransaction outgoing = new OutgoingTransaction(
+                event.getTransactionId(),
+                event.getFromClearingNumber(),
+                event.getFromAccountNumber(),
+                event.getToBankgoodNumber(),
+                event.getAmount(),
+                TransactionStatus.PENDING,
+                event.getCreatedAt(),
+                event.getUpdatedAt());
+        outgoingRepo.save(outgoing);
 
-                log.info("Forwarded transaction with ID: {}", incomingEvent.getTransactionId());
-            }
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize event to JSON for transaction {}", event.getTransactionId(), e);
-            throw new RuntimeException("Failed to process transaction", e);
-        }
+        // Create incoming event for destination bank
+        IncomingTransactionEvent incomingEvent = new IncomingTransactionEvent();
+        incomingEvent.setTransactionId(event.getTransactionId());
+        incomingEvent.setToClearingNumber(mapping.getClearingNumber());
+        incomingEvent.setToAccountNumber(mapping.getAccountNumber());
+        incomingEvent.setAmount(event.getAmount());
+        incomingEvent.setStatus(TransactionStatus.PENDING);
+        incomingEvent.setCreatedAt(event.getCreatedAt());
+
+        saveOutboxEvent(
+                event.getTransactionId(),
+                TOPIC_FORWARDED,
+                incomingEvent,
+                mapping.getClearingNumber());
+
+        log.info("Forwarded transaction {}", event.getTransactionId());
     }
 
     /**
@@ -128,6 +138,7 @@ public class TransactionService {
     @Transactional
     public void handleProcessedTransaction(TransactionResponseEvent event) {
 
+        // Idempotency check
         Optional<OutgoingTransaction> existing = outgoingRepo.findById(event.getTransactionId());
         if (!existing.isPresent()) {
             return;
@@ -137,30 +148,39 @@ public class TransactionService {
         transaction.setStatus(event.getStatus());
         outgoingRepo.save(transaction);
 
-        try {
-            // Check for duplicate transcationId/topic combination
-            boolean alreadyExists = outboxEventRepo.existsByTransactionIdAndTopic(
-                    event.getTransactionId(), TOPIC_COMPLETED);
+        saveOutboxEvent(event.getTransactionId(), TOPIC_COMPLETED, event, transaction.getFromClearingNumber());
+        // try {
 
-            if (!alreadyExists) {
-                String payload = objectMapper.writeValueAsString(event);
-                OutboxEvent outboxEvent = new OutboxEvent(
-                        event.getTransactionId(),
-                        TOPIC_COMPLETED,
-                        transaction.getFromClearingNumber(),
-                        payload);
-                outboxEventRepo.save(outboxEvent);
-                log.info("Sent response for ID: {}", event.getTransactionId());
-            }
-        } catch (JsonProcessingException e) {
-            log.error("Failed to serialize event to JSON for transaction {}", event.getTransactionId(), e);
-            throw new RuntimeException("Failed to process transaction", e);
-        }
+        // String payload = objectMapper.writeValueAsString(event);
+        // OutboxEvent outboxEvent = new OutboxEvent(
+        // event.getTransactionId(),
+        // TOPIC_COMPLETED,
+        // transaction.getFromClearingNumber(),
+        // payload);
+        // outboxEventRepo.save(outboxEvent);
+        // log.info("Sent response for ID: {}", event.getTransactionId());
+
+        // } catch (JsonProcessingException e) {
+        // log.error("Failed to serialize event to JSON for transaction {}",
+        // event.getTransactionId(), e);
+        // throw new RuntimeException("Failed to process transaction", e);
+        // }
     }
 
     public ResponseEntity<?> getOutgoingTransactionById(UUID transactionId) {
         return outgoingRepo.findByTransactionId(transactionId)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    private void saveOutboxEvent(UUID transactionId, String topic, Object eventPayload, String fromClearingNumber) {
+        try {
+            String payload = objectMapper.writeValueAsString(eventPayload);
+            OutboxEvent outboxEvent = new OutboxEvent(transactionId, topic, fromClearingNumber, payload);
+            outboxEventRepo.save(outboxEvent);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to serialize event to JSON for transaction {}", transactionId, e);
+            throw new RuntimeException("Failed to process outbox event", e);
+        }
     }
 }

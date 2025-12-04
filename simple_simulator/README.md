@@ -13,7 +13,7 @@ docker build -t simulator:latest simple_simulator/
 ---
 The simulator is a Kubernetes Job and needs to be triggered to run. The easiest way is to apply the `simulator.yaml` manifest. 
 
-From root folder, run: 
+From root folder, run:  
 
 ```bash
 kubectl delete job simulator-job # If it exists already
